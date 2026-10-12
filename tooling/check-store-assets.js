@@ -27,10 +27,6 @@ const releaseCopies = [
     source: 'marketing/rendered/marquee-1400x560.png',
     release: 'store/assets/promo/marquee-1400x560.png',
   },
-  {
-    source: 'src/icons/logo-128.png',
-    release: 'store/assets/icon/icon-128.png',
-  },
 ]
 
 function repositoryRootFromArguments(arguments_) {
