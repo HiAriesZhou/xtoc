@@ -2,7 +2,7 @@
 
 ## Repository role
 
-- This is the public source repository for the XTOC browser extension at `github.com/HiAriesZhou/xtoc` (renamed from `x-toc`; the old URL redirects, and the Portfolio slug and release-record payloads keep `x-toc`).
+- This is the public source repository for the XTOC browser extension at `github.com/HiAriesZhou/xtoc` (renamed from `x-toc`; the old URL redirects, and the profile release-notification payload keeps `x-toc`). This repository carries no portfolio-specific files.
 - XTOC provides an X/Twitter long-form article table of contents and a local clip workflow.
 - Keep this repository small, implementation-led, and safe for users, contributors, extension reviewers, and the public.
 - This is not the product-planning home for XTOC and is not the source repository for Bookmark Assistant, Bookmark Assistant Pro, or LiteContext.
@@ -89,25 +89,21 @@ npm run build:zip
 - Determine the official baseline from the latest published, non-prerelease GitHub Release and any explicitly confirmed browser-store release. Do not infer a published release from working-tree version fields or an unpublished tag. If the baseline cannot be verified, report that limitation rather than guessing.
 - Default to the next patch version (for example, official `0.4.8` becomes development `0.4.9`), unless the user specifies a different version. Use the next minor version for a new backward-compatible user-facing feature. Starting a separate feature branch is a new version boundary even when its base already contains an unreleased bump; repeated edits and builds within that feature branch do not require further increments. Documentation-only changes do not trigger a bump.
 - Keep `package.json`, `src/manifest.json`, `package-lock.json`'s root version, and version badges consistent, and verify generated manifests after building. `package-lock.json` is tracked so Extension.js resolves the same way for every build, including Mozilla's source review; update it with `npm install`, never by hand. Do not force-add build artifacts.
-- A development bump does not authorize commit, push, deployment, tag creation, store submission, or publication. Never move an existing release tag. Update Portfolio release metadata as part of the release preparation contract below; do not mark a development build as published merely because its version increased.
+- A development bump does not authorize commit, push, deployment, tag creation, store submission, or publication. Never move an existing release tag. Do not mark a development build as published merely because its version increased.
 
-## Portfolio release contract
+## GitHub Release contract
 
 Before creating a GitHub Release:
 
-1. Update `.portfolio/project.json` from shipped behavior.
-2. Commit the manifest and every referenced asset before creating the release tag.
-3. Create the tag from that exact commit.
-4. Verify the release contains the manifest with:
-   `git show <tag>:.portfolio/project.json`
-5. Do not publish a release when this verification fails.
-6. Before publishing a source manifest schema change, validate it against the Portfolio contract.
+1. Commit the release version (`package.json`, `src/manifest.json`, `package-lock.json`, README badges) and any changed store assets before creating the release tag.
+2. Create the tag from that exact commit, and verify the tagged manifest version with `git show <tag>:src/manifest.json`.
+3. Do not publish a release when this verification fails.
 
 ## Post-merge release status
 
-- After merging any PR that carries or corresponds to a release version, immediately check and report whether the matching Git tag and formal GitHub Release exist, which commit they reference, and whether that tagged commit contains `.portfolio/project.json`.
+- After merging any PR that carries or corresponds to a release version, immediately check and report whether the matching Git tag and formal GitHub Release exist, and which commit they reference.
 - Treat browser-store publication, PR merge, Git tag creation, and GitHub Release publication as separate states. Do not report the release workflow as complete while any required state is missing.
-- If a matching tag or formal GitHub Release is missing, call out the gap in the same completion report. Create it only when the user has explicitly authorized release publication, then run the Portfolio release contract checks above.
+- If a matching tag or formal GitHub Release is missing, call out the gap in the same completion report. Create it only when the user has explicitly authorized release publication, then run the GitHub Release contract checks above.
 
 ## Release-readiness checks
 
