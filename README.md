@@ -51,7 +51,7 @@ Clips and bookmarks export as Obsidian-style Markdown: a ZIP with one note per a
 
 Optional AI suggests up to three tags and a short summary for one bookmark at a time. In **Settings**, pick a provider (OpenAI, Anthropic Claude, Google Gemini, DeepSeek, OpenRouter, Qwen, Moonshot Kimi, or any OpenAI-compatible URL), paste your API key and connect; XTOC lists that provider's models and preselects a fast one. It sends only that bookmark's saved text and your existing tag names; notes are never sent. Nothing changes until you choose **Apply**. By default the key is kept only for the browser session; turn on **Remember on this device** to keep it encrypted in the extension's own storage on this device. It is never synced, exported or readable by X pages. Provider charges apply.
 
-This source version is not yet published; `.portfolio/project.json` describes the latest release.
+This source version is not yet published; [GitHub Releases](https://github.com/HiAriesZhou/xtoc/releases) list the latest release.
 
 ## Published 0.6.2 behavior
 
@@ -98,8 +98,6 @@ For day-to-day debugging, `npm run build:dev` additionally writes `dist/chromium
 `npm run build:zip` builds all three targets and writes the store packages to `release/`: `xtoc-chrome-v<version>.zip`, `xtoc-edge-v<version>.zip`, `xtoc-firefox-v<version>.zip`, plus `xtoc-source-v<version>.zip` (the committed source, for Firefox Add-ons review). Commit first; the source archive is skipped when there are uncommitted changes.
 
 Chrome/Chromium is the documented store and load-unpacked path. Firefox and Edge have separate build targets and should be tested in their own browsers before distribution.
-
-Public product metadata for downstream sites lives in [`.portfolio/project.json`](.portfolio/project.json). Update the manifest and its referenced assets as part of a public release. The release workflow can notify a configured portfolio immediately; otherwise the portfolio's scheduled pull discovers the change.
 
 ## Privacy
 

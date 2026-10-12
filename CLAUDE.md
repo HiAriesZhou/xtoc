@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 @AGENTS.md
 
-`AGENTS.md` (imported above) is the authoritative rule set: repository role, public/private routing to Obsidian, browser validation, local-data and export contracts, version policy, the Portfolio release contract, and the required completion report. This file only adds orientation that is not covered there.
+`AGENTS.md` (imported above) is the authoritative rule set: repository role, public/private routing to Obsidian, browser validation, local-data and export contracts, version policy, release status checks, and the required completion report. This file only adds orientation that is not covered there.
 
 ## Commands
 
@@ -47,5 +47,5 @@ Data model: articles keyed by `contentId(url)` from `src/library/model.js` (`art
 ## Manifest and metadata
 
 - `src/manifest.json` uses Extension.js browser-prefixed keys (`chromium:` → MV3 with `action`/service worker; `firefox:` → MV2 with `browser_action`/background scripts). Check the generated manifest in `dist/<browser>` after changes.
-- `test/release-metadata.test.js` enforces that `package.json`, `src/manifest.json`, and both READMEs' version badges agree, that the version is not older than `.portfolio/project.json` `releaseVersion`, and that every Portfolio asset path exists.
+- `test/release-metadata.test.js` enforces that `package.json`, `src/manifest.json`, and `package-lock.json`, and both READMEs' version badges agree.
 - `store/` holds the browser-store release definition (`store/release.yml`, listing text, release copies of assets); `marketing/` holds how they are made (`store-art.html` template, real UI captures in `ui/`, fixtures, social card); `assets/brand/` holds the logo and wordmark sources. `tooling/check-store-assets.js` fails `npm test` and `build:zip` when they diverge.

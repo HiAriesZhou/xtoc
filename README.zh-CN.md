@@ -51,7 +51,7 @@ Clips 和书签可导出为 Obsidian 风格的 Markdown：ZIP 中每篇文章或
 
 可选 AI 每次为一条书签建议最多三个标签和一段简短摘要。在 **Settings** 中选择服务商（OpenAI、Anthropic Claude、Google Gemini、DeepSeek、OpenRouter、通义千问、Moonshot Kimi，或任意 OpenAI 兼容地址），粘贴 API Key 并连接；XTOC 会读取该服务商的模型列表并预选一个轻量模型。只发送该书签已保存的正文和已有标签名，不发送笔记；点击 **Apply** 前不会修改任何内容。Key 默认只保存在本次浏览器会话中；开启 **Remember on this device** 后，会加密保存在本设备的扩展存储里，不会同步、导出，X 页面也无法读取。费用由服务商收取。
 
-该源码版本尚未发布；`.portfolio/project.json` 对应最新正式版本。
+该源码版本尚未发布；最新正式版本见 [GitHub Releases](https://github.com/HiAriesZhou/xtoc/releases)。
 
 ## 正式版 0.6.2 的已上线能力
 
@@ -98,8 +98,6 @@ Chrome/Chromium 是当前有文档说明的商店与本地加载路径。Firefox
 日常调试可运行 `npm run build:dev`，会额外生成 `dist/chromium-dev`：内容与正式构建相同，但名称为 **XTOC (Development)**，工具栏图标为带斜纹的橙色版本，便于与商店正式版区分。加载该目录代替 `dist/chromium`；它拥有独立的扩展 ID 和本地存储。发布 ZIP 始终使用未改标识的正式构建。
 
 `npm run build:zip` 会构建三个平台，并把商店安装包写入 `release/`：`xtoc-chrome-v<版本>.zip`、`xtoc-edge-v<版本>.zip`、`xtoc-firefox-v<版本>.zip`，以及供 Firefox 附加组件审核使用的源码包 `xtoc-source-v<版本>.zip`（来自已提交的代码）。请先提交；存在未提交改动时会跳过源码包。
-
-供下游站点使用的公开产品元数据位于 [`.portfolio/project.json`](.portfolio/project.json)。发布公开版本时，请同步更新清单及其引用的资源。发布工作流可在完成配置后立即通知作品集；否则作品集会通过定时拉取发现变更。
 
 ## 隐私
 
