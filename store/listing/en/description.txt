@@ -15,7 +15,7 @@ Organize and export
 • Export as Obsidian-style Markdown (one note per post or article, with properties, tags and quoted clips), or export clips as JSON
 
 Optional AI (off by default)
-• Suggest up to three tags and a short summary for a bookmark using your own API key (OpenAI, Anthropic, Google Gemini, DeepSeek, OpenRouter, Qwen, Moonshot Kimi or any OpenAI-compatible service)
+• Suggest up to three tags and a short summary for a bookmark using your own provider API key
 • Runs only when you click it. Only that bookmark's saved text and your existing tag names are sent, directly to the provider you choose; your notes are never sent. Nothing changes until you apply the suggestion
 • The key is kept for the browser session, or, if you choose, encrypted on this device. It is never synced or exported
 
