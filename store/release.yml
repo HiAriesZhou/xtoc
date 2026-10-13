@@ -37,7 +37,7 @@ privacy:
     uses: false
     justification: null
   collectedData:
-    - authenticationInfo
+    - authenticationInformation
     - userActivity
     - websiteContent
   certifications:
