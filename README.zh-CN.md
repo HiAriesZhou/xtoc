@@ -39,31 +39,24 @@ https://github.com/user-attachments/assets/b107995f-3b2a-4432-9530-48a93c886aa3
 2. **保存原句。** 选中文字并点击 `save to xtoc`。XTOC 会在本地保存原文、所属文章、可识别到的作者、时间和前后文。
 3. **整理并导出。** 在 Library 中搜索摘录、添加标签或笔记、删除内容，并将全部或选中摘录导出为 Markdown 或 JSON。
 
-## 当前源码中的 Library（0.7.0）
+## 功能
+
+- **文章导航**：识别 X.com 和 Twitter.com 长文的标题，可在 Popup 或可拖动的浮动目录中跳转章节，浮动目录会记住位置。
+- **摘录**：选中文字一键保存到本地，同时记录所属文章、可识别到的作者、时间和前后文。
+- **书签**：在 Popup 点击 **Save to Bookmarks** 保存当前文章或帖子，或从 X 书签页导入。导入只读取已加载的预览，不会修改你的 X 书签。
+- **更新后无需刷新**：安装或更新 XTOC 后，已打开的 X 标签页可以直接继续使用。
 
 从 Popup 或浮动目录打开 **Library**，包含三个页面：
 
 - **Clips**：搜索、标注、删除和导出已保存的摘录。
-- **Bookmarks**：在 Popup 点击 **Save to Bookmarks** 保存的文章和帖子，或从 X 书签页导入的书签。导入只读取已加载的预览，不会修改你的 X 书签。
+- **Bookmarks**：搜索、标注、删除和导出已保存的文章和帖子。
 - **Settings**：可选的 AI 设置和本地存储用量。
 
-Clips 和书签可导出为 Obsidian 风格的 Markdown：ZIP 中每篇文章或帖子一个笔记，带 YAML 属性和标签，摘录以引用 callout 呈现。Clips 也可导出为 JSON v1。
+Clips 和书签可导出为 Obsidian 风格的 Markdown：ZIP 中每篇文章或帖子一个笔记，带 YAML 属性和标签，摘录以引用 callout 呈现。Clips 也可导出为 JSON v1。可以导出全部，也可以只导出选中的内容。
 
 可选 AI 每次为一条书签建议最多三个标签和一段简短摘要。在 **Settings** 中选择服务商（OpenAI、Anthropic Claude、Google Gemini、DeepSeek、OpenRouter、通义千问、Moonshot Kimi，或任意 OpenAI 兼容地址），粘贴 API Key 并连接；XTOC 会读取该服务商的模型列表并预选一个轻量模型。只发送该书签已保存的正文和已有标签名，不发送笔记；点击 **Apply** 前不会修改任何内容。Key 默认只保存在本次浏览器会话中；开启 **Remember on this device** 后，会加密保存在本设备的扩展存储里，不会同步、导出，X 页面也无法读取。费用由服务商收取。
 
-该源码版本尚未发布；最新正式版本见 [GitHub Releases](https://github.com/HiAriesZhou/xtoc/releases)。
-
-## 正式版 0.6.2 的已上线能力
-
-- 识别 X.com 和 Twitter.com 长文标题并跳转章节。
-- 在 Popup 和浮动目录中查看文章结构。
-- 拖动浮动目录，并记住它的位置。
-- 在支持的长文中选中文字，一键保存到本地。
-- 按文章分组的摘录库，以及搜索、标签和笔记。
-- 将选中摘录或全部摘录导出为 Markdown / JSON。
-- 本地存储，无需单独注册 XTOC 账号，也不会上传摘录。
-
-当前版本会保存摘录供之后查看；它不会在原文中恢复高亮，也不会把摘录同步到云端。
+数据都保存在浏览器本地，无需单独注册 XTOC 账号。XTOC 会保存摘录供之后查看；它不会在原文中恢复高亮，也不会把摘录同步到云端。
 
 ## 安装
 

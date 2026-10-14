@@ -39,31 +39,24 @@ Watch the 40-second demo: navigate an article, save passages, edit tags and note
 2. **Save a passage.** Select text and click `save to xtoc`. XTOC stores the passage locally with its article, author when available, timestamps, and surrounding context.
 3. **Organize and export.** Open Library to search clips, add tags or notes, delete items, and export all or selected clips as Markdown or JSON.
 
-## Library in this source checkout (0.7.0)
+## Features
+
+- **Article navigation** — heading detection for X.com and Twitter.com long-form articles, in the popup or a draggable floating table of contents that remembers its position.
+- **Clips** — select text and save it locally with one click, together with its article, author when available, timestamps and surrounding context.
+- **Bookmarks** — save the current article or post with **Save to Bookmarks** in the popup, or import from your X Bookmarks page. Imports only read loaded previews and never change your X bookmarks.
+- **No reload after updates** — X tabs that were already open keep working when XTOC is installed or updated.
 
 Open **Library** from the popup or the pinned contents panel. It has three pages:
 
 - **Clips** — search, tag, annotate, delete and export your saved passages.
-- **Bookmarks** — articles and posts saved with **Save to Bookmarks** in the popup, or imported from your X Bookmarks page. Imports only read loaded previews and never change your X bookmarks.
+- **Bookmarks** — search, tag, annotate, delete and export saved articles and posts.
 - **Settings** — optional AI and local storage usage.
 
-Clips and bookmarks export as Obsidian-style Markdown: a ZIP with one note per article or post, YAML properties, tags, and clips as quote callouts. Clips can also be exported as JSON v1.
+Clips and bookmarks export as Obsidian-style Markdown: a ZIP with one note per article or post, YAML properties, tags, and clips as quote callouts. Clips can also be exported as JSON v1. You can export everything or only selected items.
 
 Optional AI suggests up to three tags and a short summary for one bookmark at a time. In **Settings**, pick a provider (OpenAI, Anthropic Claude, Google Gemini, DeepSeek, OpenRouter, Qwen, Moonshot Kimi, or any OpenAI-compatible URL), paste your API key and connect; XTOC lists that provider's models and preselects a fast one. It sends only that bookmark's saved text and your existing tag names; notes are never sent. Nothing changes until you choose **Apply**. By default the key is kept only for the browser session; turn on **Remember on this device** to keep it encrypted in the extension's own storage on this device. It is never synced, exported or readable by X pages. Provider charges apply.
 
-This source version is not yet published; [GitHub Releases](https://github.com/HiAriesZhou/xtoc/releases) list the latest release.
-
-## Published 0.6.2 behavior
-
-- Heading detection and section navigation for X.com and Twitter.com long-form articles.
-- Popup and floating table-of-contents views.
-- A draggable floating panel whose position is remembered.
-- One-click local clipping from text selections in supported articles.
-- An article-grouped clip library with search, tags, and notes.
-- Selected or full-library export to Markdown and JSON.
-- Local storage with no clip uploads or separate XTOC account.
-
-XTOC currently saves passages for later review; it does not restore highlights in the original article or sync clips to a cloud service.
+Everything stays in your browser, with no separate XTOC account. XTOC saves passages for later review; it does not restore highlights in the original article or sync clips to a cloud service.
 
 ## Install
 
