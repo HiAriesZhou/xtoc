@@ -8,6 +8,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
+Run extension commands and DashBye from `apps/extension/`; extension paths below are relative to that directory. Root READMEs remain at the repository root. Website commands run separately in `apps/web/` (`npm ci`, `npm run lint`, `npm run build`).
+
 ```bash
 npm test                                   # runs `check:store-assets` (pretest), then `node --test`
 node --test test/library.test.js          # single test file (skips the store-asset check)

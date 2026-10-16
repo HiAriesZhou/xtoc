@@ -11,6 +11,8 @@ Thanks for your interest in XTOC.
 
 ## Development
 
+Run these commands and DashBye from `apps/extension/` in the repository.
+
 ```bash
 npm install
 npm run dev

@@ -1,5 +1,5 @@
 <h1 align="center">
-  <img src="assets/brand/wordmark.svg" width="280" alt="XTOC">
+  <img src="apps/extension/assets/brand/wordmark.svg" width="280" alt="XTOC">
 </h1>
 
 <p align="center">
@@ -67,7 +67,7 @@ Clips 和书签可导出为 Obsidian 风格的 Markdown：ZIP 中每篇文章或
 
 ```bash
 git clone https://github.com/HiAriesZhou/xtoc.git
-cd xtoc
+cd xtoc/apps/extension
 npm install
 npm run build
 ```
@@ -77,6 +77,8 @@ npm run build
 </details>
 
 ## 开发
+
+扩展命令和 DashBye 均在 `apps/extension/` 下运行，以下路径相对于该目录。网站位于 [`apps/web/`](apps/web/README.zh-CN.md)；两个应用各自保留 npm lockfile，不使用根 workspace。
 
 ```bash
 npm run dev
@@ -90,7 +92,7 @@ Chrome/Chromium 是当前有文档说明的商店与本地加载路径。Firefox
 
 日常调试可运行 `npm run build:dev`，会额外生成 `dist/chromium-dev`：内容与正式构建相同，但名称为 **XTOC (Development)**，工具栏图标为带斜纹的橙色版本，便于与商店正式版区分。加载该目录代替 `dist/chromium`；它拥有独立的扩展 ID 和本地存储。发布 ZIP 始终使用未改标识的正式构建。
 
-`npm run build:zip` 会构建三个平台，并把商店安装包写入 `release/`：`xtoc-chrome-v<版本>.zip`、`xtoc-edge-v<版本>.zip`、`xtoc-firefox-v<版本>.zip`，以及供 Firefox 附加组件审核使用的源码包 `xtoc-source-v<版本>.zip`（来自已提交的代码）。请先提交；存在未提交改动时会跳过源码包。
+`npm run build:zip` 会构建三个平台，并把商店安装包写入 `release/`：`xtoc-chrome-v<版本>.zip`、`xtoc-edge-v<版本>.zip`、`xtoc-firefox-v<版本>.zip`，以及供 Firefox 附加组件审核使用的源码包 `xtoc-source-v<版本>.zip`（来自已提交的代码）。请先提交；扩展目录存在未提交改动时会跳过源码包。
 
 ## 隐私
 
@@ -98,7 +100,7 @@ Chrome/Chromium 是当前有文档说明的商店与本地加载路径。Firefox
 
 ## 项目链接
 
-[产品网站](https://x-toc.vercel.app) · [项目案例](https://www.arieszhou.com/zh/projects/x-toc) · [参与贡献](CONTRIBUTING.md)
+[产品网站](https://x-toc.vercel.app) · [项目案例](https://www.arieszhou.com/zh/projects/x-toc) · [参与贡献](apps/extension/CONTRIBUTING.md)
 
 ## 许可证
 
