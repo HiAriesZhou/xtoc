@@ -18,7 +18,9 @@
 </p>
 
 <p align="center">
-  <a href="https://chromewebstore.google.com/detail/nbdgpckkcfkomnmdefinikjijgljgjfp?utm_source=item-share-cb"><strong>从 Chrome 应用商店安装</strong></a>
+  <a href="https://chromewebstore.google.com/detail/nbdgpckkcfkomnmdefinikjijgljgjfp?utm_source=item-share-cb"><img src="https://img.shields.io/badge/Chrome-Install-4285F4?logo=googlechrome&logoColor=white" alt="安装 Chrome 版本"></a>
+  <a href="https://microsoftedge.microsoft.com/addons/detail/hpgegkkfhicelbjniafajmpicdjjmakf"><img src="https://img.shields.io/badge/Edge-Install-0078D7" alt="安装 Edge 版本"></a>
+  <a href="https://addons.mozilla.org/firefox/addon/xtoc-navigate-clip-x-articles/"><img src="https://img.shields.io/badge/Firefox-Install-FF7139?logo=firefoxbrowser&logoColor=white" alt="安装 Firefox 版本"></a>
 </p>
 
 **Star 不会修复 Bug，但会让修 Bug 的人开心。**
@@ -60,7 +62,7 @@ Clips 和书签可导出为 Obsidian 风格的 Markdown：ZIP 中每篇文章或
 
 ## 安装
 
-推荐直接安装 [Chrome 应用商店版本](https://chromewebstore.google.com/detail/nbdgpckkcfkomnmdefinikjijgljgjfp?utm_source=item-share-cb)。
+可从 [Chrome 应用商店](https://chromewebstore.google.com/detail/nbdgpckkcfkomnmdefinikjijgljgjfp?utm_source=item-share-cb)、[Microsoft Edge 附加组件商店](https://microsoftedge.microsoft.com/addons/detail/hpgegkkfhicelbjniafajmpicdjjmakf)或 [Firefox 附加组件商店](https://addons.mozilla.org/firefox/addon/xtoc-navigate-clip-x-articles/)安装 XTOC。
 
 <details>
 <summary>从源码安装</summary>
@@ -88,7 +90,7 @@ npm run build:firefox
 npm run build:edge
 ```
 
-Chrome/Chromium 是当前有文档说明的商店与本地加载路径。Firefox 和 Edge 有各自的构建目标，分发前仍需在对应浏览器中验证。
+Chrome、Edge 和 Firefox 版本已在各自商店发布。Chromium、Firefox 和 Edge 有各自的构建目标，分发前仍需在对应浏览器中验证。
 
 日常调试可运行 `npm run build:dev`，会额外生成 `dist/chromium-dev`：内容与正式构建相同，但名称为 **XTOC (Development)**，工具栏图标为带斜纹的橙色版本，便于与商店正式版区分。加载该目录代替 `dist/chromium`；它拥有独立的扩展 ID 和本地存储。发布 ZIP 始终使用未改标识的正式构建。
 
