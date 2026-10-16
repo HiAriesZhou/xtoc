@@ -18,7 +18,9 @@
 </p>
 
 <p align="center">
-  <a href="https://chromewebstore.google.com/detail/nbdgpckkcfkomnmdefinikjijgljgjfp?utm_source=item-share-cb"><strong>Install from the Chrome Web Store</strong></a>
+  <a href="https://chromewebstore.google.com/detail/nbdgpckkcfkomnmdefinikjijgljgjfp?utm_source=item-share-cb"><img src="https://img.shields.io/badge/Chrome-Install-4285F4?logo=googlechrome&logoColor=white" alt="Install for Chrome"></a>
+  <a href="https://microsoftedge.microsoft.com/addons/detail/hpgegkkfhicelbjniafajmpicdjjmakf"><img src="https://img.shields.io/badge/Edge-Install-0078D7" alt="Install for Edge"></a>
+  <a href="https://addons.mozilla.org/firefox/addon/xtoc-navigate-clip-x-articles/"><img src="https://img.shields.io/badge/Firefox-Install-FF7139?logo=firefoxbrowser&logoColor=white" alt="Install for Firefox"></a>
 </p>
 
 **A star won't fix bugs, but it makes the person fixing them happy.**
@@ -60,7 +62,7 @@ Everything stays in your browser, with no separate XTOC account. XTOC saves pass
 
 ## Install
 
-The [Chrome Web Store version](https://chromewebstore.google.com/detail/nbdgpckkcfkomnmdefinikjijgljgjfp?utm_source=item-share-cb) is the quickest way to start.
+Install XTOC from the [Chrome Web Store](https://chromewebstore.google.com/detail/nbdgpckkcfkomnmdefinikjijgljgjfp?utm_source=item-share-cb), [Microsoft Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/hpgegkkfhicelbjniafajmpicdjjmakf), or [Firefox Add-ons](https://addons.mozilla.org/firefox/addon/xtoc-navigate-clip-x-articles/).
 
 <details>
 <summary>Install from source</summary>
@@ -92,7 +94,7 @@ For day-to-day debugging, `npm run build:dev` additionally writes `dist/chromium
 
 `npm run build:zip` builds all three targets and writes the store packages to `release/`: `xtoc-chrome-v<version>.zip`, `xtoc-edge-v<version>.zip`, `xtoc-firefox-v<version>.zip`, plus `xtoc-source-v<version>.zip` (the committed source, for Firefox Add-ons review). Commit first; the source archive is skipped when there are uncommitted extension changes.
 
-Chrome/Chromium is the documented store and load-unpacked path. Firefox and Edge have separate build targets and should be tested in their own browsers before distribution.
+Chrome, Edge and Firefox are available from their respective stores. Chromium, Firefox and Edge have separate build targets and should be tested in their own browsers before distribution.
 
 ## Privacy
 
