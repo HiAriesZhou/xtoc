@@ -194,6 +194,7 @@ export function XtocExperience({ initialView }: { initialView: View }) {
   const [tocCollapsed, setTocCollapsed] = useState(false);
   const [demoOpen, setDemoOpen] = useState(false);
   const previewTrigger = useRef<HTMLButtonElement>(null);
+  const previewDialog = useRef<HTMLElement>(null);
   const previewClose = useRef<HTMLButtonElement>(null);
   const [toast, setToast] = useState("");
   const navigationTarget = useRef<{ index: number; scroll: number } | null>(null);
@@ -303,7 +304,25 @@ export function XtocExperience({ initialView }: { initialView: View }) {
     previewClose.current?.focus();
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    const close = (event: KeyboardEvent) => { if (event.key === "Escape") setDemoOpen(false); };
+    const close = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setDemoOpen(false);
+      if (event.key !== "Tab") return;
+      const dialog = previewDialog.current;
+      if (!dialog) return;
+      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(
+        'a[href], button, input, select, textarea, video[controls], [tabindex]'
+      )).filter((element) => !element.matches(':disabled, [tabindex="-1"]') && element.getClientRects().length > 0);
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (!first || !last) {
+        event.preventDefault();
+        dialog.focus();
+      } else if (!dialog.contains(document.activeElement) || document.activeElement === dialog ||
+        (event.shiftKey ? document.activeElement === first : document.activeElement === last)) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+      }
+    };
     window.addEventListener("keydown", close);
     return () => {
       document.body.style.overflow = previousOverflow;
@@ -583,7 +602,7 @@ export function XtocExperience({ initialView }: { initialView: View }) {
 
       {selection && <div className="selection-action"><span>{selection.length} characters selected</span><button onMouseDown={(event) => event.preventDefault()} onClick={saveSelection}><Scissors aria-hidden="true" /> Save to XTOC</button></div>}
       {toast && <div className="site-toast" role="status"><Check aria-hidden="true" />{toast}{toast.includes("saved") && <button onClick={() => openView("clips")}>View Clips</button>}</div>}
-      {demoOpen && <div className="demo-dialog-backdrop" onMouseDown={() => setDemoOpen(false)}><section className="product-film-dialog" role="dialog" aria-modal="true" aria-label="XTOC product film" onMouseDown={(event) => event.stopPropagation()}><header><span>XTOC / IN PRACTICE</span><button ref={previewClose} onClick={() => setDemoOpen(false)} aria-label="Close video"><X aria-hidden="true" /></button></header><video controls autoPlay playsInline preload="metadata" poster="/videos/x-toc-poster.jpg" aria-label="XTOC demonstration: article navigation, clipping, tags, notes, and export"><source src="/videos/x-toc-demo.mp4" type="video/mp4" /><track kind="captions" src="/videos/x-toc-demo.vtt" srcLang="en" label="English" />Your browser does not support video playback.</video><footer><a href={chromeStoreUrl} target="_blank" rel="noopener noreferrer">Get XTOC for desktop Chrome <Download aria-hidden="true" /></a><button onClick={() => { setDemoOpen(false); openView("article"); }}>Try it yourself <ArrowRight aria-hidden="true" /></button></footer></section></div>}
+      {demoOpen && <div className="demo-dialog-backdrop" onMouseDown={() => setDemoOpen(false)}><section ref={previewDialog} tabIndex={-1} className="product-film-dialog" role="dialog" aria-modal="true" aria-label="XTOC product film" onMouseDown={(event) => event.stopPropagation()}><header><span>XTOC / IN PRACTICE</span><button ref={previewClose} onClick={() => setDemoOpen(false)} aria-label="Close video"><X aria-hidden="true" /></button></header><video controls autoPlay playsInline preload="metadata" poster="/videos/x-toc-poster.jpg" aria-label="XTOC demonstration: article navigation, clipping, tags, notes, and export"><source src="/videos/x-toc-demo.mp4" type="video/mp4" /><track kind="captions" src="/videos/x-toc-demo.vtt" srcLang="en" label="English" />Your browser does not support video playback.</video><footer><a href={chromeStoreUrl} target="_blank" rel="noopener noreferrer">Get XTOC for desktop Chrome <Download aria-hidden="true" /></a><button onClick={() => { setDemoOpen(false); openView("article"); }}>Try it yourself <ArrowRight aria-hidden="true" /></button></footer></section></div>}
     </div>
   );
 }

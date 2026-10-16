@@ -3,7 +3,7 @@ import Link from "next/link";
 import styles from "./privacy.module.css";
 
 const title = "Privacy Policy";
-const description = "How XTOC uses permissions, processes article content locally, and stores your clips without telemetry or uploads.";
+const description = "How XTOC uses permissions and stores clips locally, with no telemetry and optional AI requests to your chosen provider.";
 
 export const metadata: Metadata = {
   title,
@@ -24,8 +24,8 @@ export default function PrivacyPage() {
         <div className={styles.hero}>
           <p className={styles.eyebrow}>Your reading, on your device</p>
           <h1>Privacy Policy</h1>
-          <p className={styles.lead}>Your clips stay in your browser. XTOC has no telemetry, no clip uploads, and no cloud sync.</p>
-          <p className={styles.updated}>Last updated: September 17, 2026 · Extension policy</p>
+          <p className={styles.lead}>Your clips stay in your browser unless you request optional AI suggestions. XTOC has no telemetry, no uploads to the developer, and no automatic clip sync.</p>
+          <p className={styles.updated}>Last updated: October 16, 2026 · Extension policy</p>
         </div>
 
         <section className={styles.section} aria-labelledby="scope">
@@ -46,13 +46,15 @@ export default function PrivacyPage() {
             <div><dt><code>storage</code></dt><dd>Saves clips, article metadata, tags, notes, and preferences in <code>chrome.storage.local</code>, in your local browser profile. XTOC does not use Chrome sync storage.</dd></div>
             <div><dt><code>activeTab</code></dt><dd>Lets the popup identify the active tab when you open it, check whether it is an X/Twitter page, and communicate with the article’s content script.</dd></div>
             <div><dt><code>contextMenus</code></dt><dd>Adds the “Show Table of Contents” right-click menu on X.com and Twitter.com.</dd></div>
-            <div><dt>X / Twitter access</dt><dd>Host access and content scripts are limited to <code>https://x.com/*</code> and <code>https://twitter.com/*</code>. This lets XTOC read supported articles and display the reading panel. It does not request access to all websites.</dd></div>
+            <div><dt>X / Twitter access</dt><dd>Article access and content scripts are limited to <code>https://x.com/*</code> and <code>https://twitter.com/*</code>. This lets XTOC read supported articles and display the reading panel. Optional AI separately requests host access for the provider you configure.</dd></div>
           </dl>
         </section>
 
         <section className={styles.section} aria-labelledby="transmission">
-          <h2 id="transmission">04 / No telemetry or uploads</h2>
-          <p>The extension includes no analytics, advertising trackers, or remote error reporting. It does not transmit article content, saved clips, tags, notes, or usage activity to the developer or an external server, and it does not sell or share that data. There is no XTOC backend or automatic cross-device synchronization for clips.</p>
+          <h2 id="transmission">04 / No telemetry; optional AI requests</h2>
+          <p>The extension includes no analytics, advertising trackers, or remote error reporting. It does not upload article content, saved clips, tags, notes, or usage activity to the developer. There is no XTOC backend or automatic cross-device synchronization for clips.</p>
+          <p><strong>Opt-in AI suggestions:</strong> If you enable AI and configure an external OpenAI-compatible provider endpoint and API key, requesting suggestions sends that bookmark’s saved text (or clip text), title, and existing tag names directly to your configured provider only. Personal notes are not sent. The provider handles these requests under its own privacy policy.</p>
+          <p>Your API key is stored locally in extension session storage by default. If you choose “Remember on this device”, it is encrypted in the extension’s IndexedDB on this device. The key is sent only to your configured provider to authenticate requests.</p>
           <p>Normal requests made by X/Twitter and Chrome’s extension distribution and update services are separate from XTOC’s local processing.</p>
         </section>
 
@@ -70,12 +72,12 @@ export default function PrivacyPage() {
         <section className={styles.section} aria-labelledby="website">
           <h2 id="website">06 / This website and external links</h2>
           <p>This website is a product guide and interactive demo. It does not read your extension’s clip library. The demo uses sample content and does not connect to extension storage.</p>
-          <p>Visiting the website involves normal network requests to its hosting provider, Vercel; the extension’s local-only statement does not mean website visits are invisible to a hosting provider. Links to X/Twitter, GitHub, and the Chrome Web Store open services with their own privacy practices.</p>
+          <p>Visiting the website involves normal network requests to its hosting provider, Vercel; local clip storage does not mean website visits are invisible to a hosting provider. Links to X/Twitter, GitHub, and the Chrome Web Store open services with their own privacy practices.</p>
         </section>
 
         <section className={styles.section} aria-labelledby="contact">
           <h2 id="contact">07 / Questions and policy changes</h2>
-          <p>For privacy questions, email <a href="mailto:aries0331.dev@email.com">aries0331.dev@email.com</a>. You can also inspect the <a href="https://github.com/HiAriesZhou/x-toc">extension source on GitHub</a>. Avoid posting private clips or personal data in public issues.</p>
+          <p>For privacy questions, email <a href="mailto:aries0331.dev@email.com">aries0331.dev@email.com</a>. You can also inspect the <a href="https://github.com/HiAriesZhou/xtoc">extension source on GitHub</a>. Avoid posting private clips or personal data in public issues.</p>
           <p>This policy will be updated when the extension’s data handling changes. The date above identifies the latest revision.</p>
         </section>
       </main>

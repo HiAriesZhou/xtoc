@@ -19,7 +19,10 @@ test('extension, package, and README versions agree', () => {
 
   const escaped = packageVersion.replaceAll('.', '\\.');
   for (const readme of ['README.md', 'README.zh-CN.md']) {
-    assert.match(fs.readFileSync(path.join(repoRoot, readme), 'utf8'), new RegExp(`version-${escaped}-[^"]+" alt="Version ${escaped}"`), readme);
+    const readmePath = path.join(repoRoot, readme);
+    // Standalone Mozilla source archives contain only the extension directory.
+    if (!fs.existsSync(readmePath)) continue;
+    assert.match(fs.readFileSync(readmePath, 'utf8'), new RegExp(`version-${escaped}-[^"]+" alt="Version ${escaped}"`), readme);
   }
 
 });
