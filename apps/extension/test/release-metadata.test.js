@@ -5,6 +5,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const repoRoot = path.resolve(root, '../..');
 const readText = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 const readJson = (file) => JSON.parse(readText(file));
 
@@ -18,7 +19,10 @@ test('extension, package, and README versions agree', () => {
 
   const escaped = packageVersion.replaceAll('.', '\\.');
   for (const readme of ['README.md', 'README.zh-CN.md']) {
-    assert.match(readText(readme), new RegExp(`version-${escaped}-[^"]+" alt="Version ${escaped}"`), readme);
+    const readmePath = path.join(repoRoot, readme);
+    // Standalone Mozilla source archives contain only the extension directory.
+    if (!fs.existsSync(readmePath)) continue;
+    assert.match(fs.readFileSync(readmePath, 'utf8'), new RegExp(`version-${escaped}-[^"]+" alt="Version ${escaped}"`), readme);
   }
 
 });

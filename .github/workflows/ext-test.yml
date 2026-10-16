@@ -1,9 +1,15 @@
-name: Test
+name: Extension CI
 
 on:
   pull_request:
+    paths: &extension-paths
+      - 'apps/extension/**'
+      - 'README*.md'
+      - '.portfolio/**'
+      - '.github/workflows/ext-test.yml'
   push:
     branches: [main]
+    paths: *extension-paths
 
 permissions:
   contents: read
@@ -12,6 +18,9 @@ jobs:
   test:
     name: Test and build
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/extension
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -21,6 +30,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
+          cache-dependency-path: apps/extension/package-lock.json
 
       - name: Install dependencies
         run: npm ci

@@ -1,0 +1,34 @@
+.page { max-width: 880px; margin: 0 auto; padding: 0 40px; }
+.header { display: flex; align-items: center; justify-content: space-between; gap: 24px; min-height: 104px; border-bottom: 1px solid #dce3e7; font-size: .85rem; }
+.brand { font-size: 1.4rem; font-weight: 750; letter-spacing: -.04em; }
+.brand span { display: block; margin-top: 4px; color: var(--muted-strong); font-size: .7rem; font-weight: 400; letter-spacing: 0; }
+.hero { padding: 72px 0 48px; }
+.eyebrow { color: var(--accent-text); font-size: .75rem; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; }
+.hero h1 { margin: 18px 0 22px; font: clamp(3.5rem, 8vw, 5.5rem)/1.05 var(--font-editorial); letter-spacing: -.035em; }
+.lead { max-width: 640px; font-size: 1.3rem; line-height: 1.65; }
+.updated { margin-top: 28px; color: var(--muted-strong); font-size: .8rem; }
+.section { padding: 32px 0; border-top: 1px solid #dce3e7; font-size: 1rem; line-height: 1.8; }
+.section h2 { margin: 0 0 18px; font-size: 1.15rem; letter-spacing: -.02em; line-height: 1.5; }
+.section p { margin: 14px 0; }
+.section a { color: var(--accent-text); text-decoration: underline; text-underline-offset: 3px; overflow-wrap: anywhere; }
+.section ul { padding-left: 24px; }
+.section li + li { margin-top: 12px; }
+.note { margin-top: 24px; padding: 22px 24px; border-left: 3px solid var(--accent-text); background: var(--soft); }
+.note p { margin-bottom: 0; }
+.permissions { margin: 0; }
+.permissions > div { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 24px; padding: 20px 0; border-bottom: 1px solid var(--line); }
+.permissions > div:last-child { border: 0; padding-bottom: 0; }
+.permissions dt { font-weight: 700; }
+.permissions dd { margin: 0; }
+.permissions code { font-size: .9em; overflow-wrap: anywhere; }
+.footer { display: flex; flex-wrap: wrap; gap: 24px; padding: 28px 0 48px; border-top: 1px solid #dce3e7; color: var(--accent-text); font-size: .9rem; }
+.header a:hover, .footer a:hover { text-decoration: underline; text-underline-offset: 4px; }
+@media (max-width: 600px) {
+  .page { padding: 0 24px; }
+  .header { min-height: 88px; gap: 16px; }
+  .brand span { max-width: 140px; line-height: 1.5; }
+  .hero { padding: 44px 0 32px; }
+  .lead { font-size: 1.15rem; }
+  .permissions > div { grid-template-columns: 1fr; gap: 6px; }
+  .note { padding: 18px; }
+}

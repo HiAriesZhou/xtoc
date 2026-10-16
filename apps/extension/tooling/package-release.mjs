@@ -57,7 +57,7 @@ function zipDirectory(sourceDir, outFile) {
 }
 
 function sourceArchive(outFile) {
-  const dirty = run('git', ['status', '--porcelain'], { cwd: root }).trim();
+  const dirty = run('git', ['status', '--porcelain', '--', '.'], { cwd: root }).trim();
   if (dirty) {
     return 'skipped: uncommitted changes would not match the built Firefox package. Commit, then run again.';
   }

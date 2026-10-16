@@ -2,10 +2,17 @@
 
 ## Repository role
 
-- This is the public source repository for the XTOC browser extension at `github.com/HiAriesZhou/xtoc` (renamed from `x-toc`; the old URL redirects, and the profile release-notification payload keeps `x-toc`). This repository carries no portfolio-specific files.
+- This is the public monorepo for the XTOC browser extension and website at `github.com/HiAriesZhou/xtoc` (renamed from `x-toc`; the old URL redirects, and the profile release-notification payload keeps `x-toc`). This repository carries no portfolio-specific files.
 - XTOC provides an X/Twitter long-form article table of contents and a local clip workflow.
 - Keep this repository small, implementation-led, and safe for users, contributors, extension reviewers, and the public.
 - This is not the product-planning home for XTOC and is not the source repository for Bookmark Assistant, Bookmark Assistant Pro, or LiteContext.
+
+## App boundaries
+
+- `apps/extension/` contains the extension implementation and is the source of truth for extension behavior. Unless explicitly qualified, extension paths and commands below are relative to this directory. Run DashBye here too; its configuration and artifact paths remain app-relative.
+- `apps/web/` contains public pages, website assets, and website maintenance. Run `npm ci`, `npm run lint`, and `npm run build` here. Website copy must describe only released extension capabilities, with narrow, verifiable privacy claims. Validate user-facing page changes at mobile and desktop sizes, including navigation, keyboard focus, semantics, contrast, and overflow.
+- Each app retains its own package and lockfile; there is no root npm workspace. Root READMEs, LICENSE, AGENTS.md, CLAUDE.md, and workflows apply to the repository. The extension also carries LICENSE for its standalone source archive.
+- Keep both apps free of private planning, business strategy, competitor research, internal operations, and unreleased claims. Use the Obsidian routing below; never use repository files as a fallback.
 
 ## Source-of-truth routing
 
@@ -45,7 +52,7 @@ npm run build:zip
 - There is currently no lint script. Do not report lint as passed and do not run `npm run lint`. Add lint tooling only when that is part of the requested implementation work.
 - `npm run build` creates the Chromium build in `dist/chromium`; `build:firefox` and `build:edge` exercise their respective Extension.js targets. `dist/` and generated ZIP files are build artifacts and must stay untracked.
 - `build:dev` runs `build`, then writes a local-only debug copy to `dist/chromium-dev` with the name `XTOC (Development)` and the icons from `tooling/dev-icons/`. Use it for local Chrome load-unpacked debugging only; never package, upload, or submit it. Regenerate dev icons with `node tooling/generate-dev-icons.mjs` after changing `src/icons/`; a test fails when they are stale.
-- `build:zip` builds Chromium, Edge and Firefox, then writes `release/xtoc-{chrome,edge,firefox}-v<version>.zip` for store upload and `release/xtoc-source-v<version>.zip` (a `git archive` of `HEAD`, for Mozilla review). It verifies each archive, the manifest version and Manifest V3/V2 per target, and refuses development branding or dev-only files. The source archive is skipped when the working tree has uncommitted changes. Packaging is not a substitute for testing in Edge and Firefox, and does not authorize uploading.
+- `build:zip` builds Chromium, Edge and Firefox, then writes `release/xtoc-{chrome,edge,firefox}-v<version>.zip` for store upload and `release/xtoc-source-v<version>.zip` (a `git archive` of `HEAD`, for Mozilla review). It verifies each archive, the manifest version and Manifest V3/V2 per target, and refuses development branding or dev-only files. The source archive is skipped when the extension directory has uncommitted changes. Packaging is not a substitute for testing in Edge and Firefox, and does not authorize uploading.
 
 ## Release package cleanup
 
@@ -96,7 +103,7 @@ npm run build:zip
 Before creating a GitHub Release:
 
 1. Commit the release version (`package.json`, `src/manifest.json`, `package-lock.json`, README badges) and any changed store assets before creating the release tag.
-2. Create the tag from that exact commit, and verify the tagged manifest version with `git show <tag>:src/manifest.json`.
+2. Create the tag from that exact commit, and verify the tagged manifest version with `git show <tag>:apps/extension/src/manifest.json`.
 3. Do not publish a release when this verification fails.
 
 ## Post-merge release status
