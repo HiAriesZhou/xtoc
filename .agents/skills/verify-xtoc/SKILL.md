@@ -11,27 +11,28 @@ Run from the repository root. The extension is the primary surface; the Next.js 
 
 ```bash
 (cd apps/extension && npm ci && npm test && npm run build)
-npm install --prefix /tmp/xtoc-verify-tools --no-save playwright@1.64.1
-/tmp/xtoc-verify-tools/node_modules/.bin/playwright install chromium
+export XTOC_VERIFY_DEPS="$(node -p "require('node:path').join(require('node:os').tmpdir(), 'xtoc-verify-tools')")"
+npm install --prefix "$XTOC_VERIFY_DEPS" --no-save playwright@1.64.1
+node "$XTOC_VERIFY_DEPS/node_modules/playwright/cli.js" install chromium
 node .agents/skills/verify-xtoc/scripts/verify.cjs doctor
 node .agents/skills/verify-xtoc/scripts/verify.cjs run
 ```
 
 `run` performs launch → doctor → drive → cleanup in one owned process. It starts a localhost HTTP fixture server on an ephemeral port, then Playwright's **full Chromium**, `channel: chromium`, headless, with `--disable-extensions-except=<absolute apps/extension/dist/chromium>` and `--load-extension=<same path>`. Do not use the headless-shell binary, which is not the extension test target. A fresh temporary profile isolates storage from the user's browser.
 
-The harness fulfills exactly `https://x.com/xtoc_fixture/status/1234567890` with bytes fetched from that localhost server. This is network-boundary substitution: HTTPS origin and manifest matching remain real. It does not add localhost permission, inject content code manually, or contact X. Unexpected page HTTP requests fail the run. Synthetic author/text contain no credentials.
+The harness fulfills exactly `https://x.com/xtoc_fixture/status/1234567890` with bytes fetched from that localhost server. This is network-boundary substitution: HTTPS origin and manifest matching remain real. It does not add localhost permission, inject content code manually, or contact X. The only other allowed page HTTP request is exactly `https://x.com/favicon.ico`, fulfilled locally with an empty 204 response to suppress the browser’s incidental favicon fetch. Both allowed URLs are recorded in `requests.json`; unexpected page HTTP requests fail the run. Synthetic author/text contain no credentials.
 
 Ready signal: `READY: real extension content script attached; evidence …`, after the installed content script creates `#xtoc-save-excerpt-button`. Startup/selector/assertion failures produce nonzero exit and `failure.json`; preserve them, fix the cause, and rerun in a new directory. Teardown is the `finally` block, including on failed assertions; wait for `CLEANUP` before retrying.
 
 For an existing external Playwright installation/full Chromium executable, override without editing the repo:
 
 ```bash
-XTOC_VERIFY_DEPS=/tmp/xtoc-browser-check \
-XTOC_VERIFY_CHROMIUM=/tmp/xmc-browsers/chromium-1248/chrome-linux64/chrome \
+XTOC_VERIFY_DEPS=/path/to/playwright-install \
+XTOC_VERIFY_CHROMIUM=/path/to/chrome \
 node .agents/skills/verify-xtoc/scripts/verify.cjs run
 ```
 
-These overrides were available in the proof environment; the install commands above are the portable setup. `XTOC_VERIFY_DEPS` is a directory containing `node_modules/playwright`, not the package itself.
+`XTOC_VERIFY_DEPS` is a directory containing `node_modules/playwright`, not the package itself.
 
 ## Doctor
 
@@ -51,7 +52,7 @@ The harness observes storage from the extension service worker using `chrome.sto
 
 ## Evidence
 
-Every run writes to `/workspace/verify-evidence/xtoc/<timestamp>/`, outside the checkout and profile. Evidence must show a real user action and resulting state, plus persistent side effects where applicable. This harness produces:
+Every run writes to `<evidence-root>/<timestamp>/`. Set `XTOC_VERIFY_EVIDENCE` to an evidence root outside the checkout and browser profile; the default is `path.join(os.tmpdir(), "xtoc-verify-evidence")`. Evidence must show a real user action and resulting state, plus persistent side effects where applicable. This harness produces:
 
 - `01-selection-action.png`: selected text and visible save affordance.
 - `02-saved-result.png`: clicked button's saved state.
@@ -74,9 +75,9 @@ There is no extension lint script. Builds are not cross-browser runtime proof. K
 
 ## Cleanup
 
-The helper closes its own Playwright context and localhost server, removes only the temporary profile it created, and writes `cleanup.json`. Never kill processes by name, touch a user's browser profile, or delete evidence. For an interrupted run, signal only the recorded harness PID from `launch.json`; its signal handler closes the owned browser. Do not use `killall`/`pkill`. If force termination was necessary, inspect remaining child PIDs and ownership before stopping any of them, and record incomplete cleanup.
+The helper closes its own Playwright context and localhost server, removes only the temporary profile it created, and writes `cleanup.json`. Never kill processes by name, touch a user's browser profile, or delete evidence. For an interrupted run, signal only the recorded harness PID from `launch.json`; its SIGINT/SIGTERM handler awaits the same cleanup, then exits with status 130/143 respectively. Do not use `killall`/`pkill`. If force termination was necessary, inspect remaining child PIDs and ownership before stopping any of them, and record incomplete cleanup.
 
-After `CLEANUP`, confirm the printed evidence directory still contains the PNGs, `result.json`, and `cleanup.json` with closed resources. Failed iterations must also finish cleanup before another launch. Evidence survives cleanup and local Git operations.
+After `CLEANUP`, confirm the printed evidence directory still contains the PNGs, `result.json`, and `cleanup.json` with `browserClosed: true` (observed context `close` event), `fixtureServerClosed: true`, `profileRemoved: true`, and no `cleanupErrors`. Browser close, profile removal, and server close are attempted independently; cleanup errors make the run fail. Failed iterations must also finish cleanup before another launch. Evidence survives cleanup and local Git operations.
 
 ## Helpers
 
