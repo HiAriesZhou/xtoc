@@ -1,14 +1,23 @@
-// Local Chrome debug build. Copies the Chromium build to dist/chromium-dev and
-// rebrands it (name, toolbar title, icons) so it is never confused with the
-// published extension. dist/chromium and release ZIPs stay untouched.
+// Local Chrome debug build. Copies the Chromium build to dist/chromium-dev at the
+// repository root and rebrands it (name, toolbar title, icons) so it is never
+// confused with the published extension. dist/chromium and release ZIPs stay untouched.
 //
-// Usage: npm run build:dev   (then load dist/chromium-dev in chrome://extensions)
+// Usage: npm run build:dev   (then load <repo>/dist/chromium-dev in chrome://extensions)
 import { cp, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 const root = path.resolve(import.meta.dirname, '..');
 const SOURCE_DIR = path.join(root, 'dist', 'chromium');
-export const DEV_BUILD_DIR = path.join(root, 'dist', 'chromium-dev');
+
+// Keep one stable path: Chrome derives an unpacked extension's ID, and therefore
+// its local storage, from the folder it was loaded from. Outside the monorepo
+// layout (e.g. the Mozilla source archive) stay inside the package.
+export function devBuildDir(packageDir) {
+  const repoRoot = path.resolve(packageDir, '..', '..');
+  const inMonorepo = path.relative(repoRoot, packageDir) === path.join('apps', 'extension');
+  return path.join(inMonorepo ? repoRoot : packageDir, 'dist', 'chromium-dev');
+}
+export const DEV_BUILD_DIR = devBuildDir(root);
 const DEV_ICON_SOURCE = path.join(root, 'tooling', 'dev-icons');
 const DEV_SEED_SOURCE = path.join(root, 'tooling', 'dev-seed.json');
 export const DEV_SEED_TARGET = 'dev/seed.json'; // must match SEED_PATH in src/library/dev-seed.js
@@ -43,7 +52,7 @@ async function main() {
   const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
   const branded = applyDevBranding(manifest);
   await writeFile(manifestPath, `${JSON.stringify(branded, null, 2)}\n`);
-  console.log(`${branded.name} ${branded.version} → ${path.relative(root, DEV_BUILD_DIR)}`);
+  console.log(`${branded.name} ${branded.version} → ${DEV_BUILD_DIR}`);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
