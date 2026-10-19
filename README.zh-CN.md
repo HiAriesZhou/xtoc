@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/HiAriesZhou/xtoc/releases"><img src="https://img.shields.io/badge/version-0.7.0-blue" alt="Version 0.7.0"></a>
+  <a href="https://github.com/HiAriesZhou/xtoc/releases"><img src="https://img.shields.io/badge/version-0.8.0-blue" alt="Version 0.8.0"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License"></a>
   <a href="https://chromewebstore.google.com/detail/nbdgpckkcfkomnmdefinikjijgljgjfp?utm_source=item-share-cb"><img src="https://img.shields.io/chrome-web-store/size/nbdgpckkcfkomnmdefinikjijgljgjfp" alt="Chrome Web Store"></a>
 </p>
@@ -46,6 +46,7 @@ https://github.com/user-attachments/assets/b107995f-3b2a-4432-9530-48a93c886aa3
 - **文章导航**：识别 X.com 和 Twitter.com 长文的标题，可在 Popup 或可拖动的浮动目录中跳转章节，浮动目录会记住位置。
 - **摘录**：选中文字一键保存到本地，同时记录所属文章、可识别到的作者、时间和前后文。
 - **书签**：在 Popup 点击 **Save to Bookmarks** 保存当前文章或帖子，或从 X 书签页导入。导入只读取已加载的预览，不会修改你的 X 书签。
+  再次导入时，可在同一账号、同一列表的上次导入位置停止；在导入菜单中选择 **Scan all bookmarks** 可检查更早的书签。首次导入、无法识别列表或导入记录失效时会完整扫描；页面加载失败时仍可能需要重试。在书签页打开 XTOC 弹窗，也能使用同样的导入按钮并查看进度，关闭导入条后仍可从这里重新开始。导入时请保持该标签页可见；标签页在后台时导入会暂停等待。
 - **更新后无需刷新**：安装或更新 XTOC 后，已打开的 X 标签页可以直接继续使用。
 
 从 Popup 或浮动目录打开 **Library**，包含三个页面：
@@ -92,7 +93,7 @@ npm run build:edge
 
 Chrome、Edge 和 Firefox 版本已在各自商店发布。Chromium、Firefox 和 Edge 有各自的构建目标，分发前仍需在对应浏览器中验证。
 
-日常调试可运行 `npm run build:dev`，会额外生成 `dist/chromium-dev`：内容与正式构建相同，但名称为 **XTOC (Development)**，工具栏图标为带斜纹的橙色版本，便于与商店正式版区分。加载该目录代替 `dist/chromium`；它拥有独立的扩展 ID 和本地存储。发布 ZIP 始终使用未改标识的正式构建。
+日常调试可运行 `npm run build:dev`，会额外在仓库根目录生成 `dist/chromium-dev`（其他构建仍在 `apps/extension/dist/`）：内容与正式构建相同，但名称为 **XTOC (Development)**，工具栏图标为带斜纹的橙色版本，便于与商店正式版区分。加载该目录代替 `dist/chromium`；它拥有独立的扩展 ID 和本地存储，二者跟随该目录路径，之后再运行 `build:dev` 会原地更新。发布 ZIP 始终使用未改标识的正式构建。
 
 `npm run build:zip` 会构建三个平台，并把商店安装包写入 `release/`：`xtoc-chrome-v<版本>.zip`、`xtoc-edge-v<版本>.zip`、`xtoc-firefox-v<版本>.zip`，以及供 Firefox 附加组件审核使用的源码包 `xtoc-source-v<版本>.zip`（来自已提交的代码）。请先提交；扩展目录存在未提交改动时会跳过源码包。
 

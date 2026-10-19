@@ -5,6 +5,7 @@ import { applySeed, removeSeed, SEED_PATH } from './library/dev-seed.js';
 import { reinjectionTargets } from './reinject.js';
 import { createVault, idbStore, memoryStore } from './library/key-vault.js';
 import { aiPermissions } from './library/ai-permissions.js';
+import { IMPORT_KEY, importStatus, nextCheckpoints, usableCheckpoint, validScope } from './library/bookmark-import.js';
 
 const AI_CONFIG_KEY = 'xtocAIConfig'; // session storage: includes the key
 const AI_PREFS_KEY = 'xtocAIPrefs'; // local storage: provider, URL, model, remember flag; never the key
@@ -19,8 +20,14 @@ const load = async () => readState(await chrome.storage.local.get(Object.values(
 
 // Every library write runs here, one at a time, so concurrent saves from
 // several tabs cannot overwrite each other. Only changed keys are written.
+function enqueue(fn) {
+  const work = writes.then(fn);
+  writes = work.catch(() => {});
+  return work;
+}
+
 function transaction(fn) {
-  const work = writes.then(async () => {
+  return enqueue(async () => {
     const state = await load();
     const before = Object.fromEntries(
       Object.entries(writeState(state)).map(([k, v]) => [k, JSON.stringify(v)])
@@ -36,8 +43,6 @@ function transaction(fn) {
     }
     return result;
   });
-  writes = work.catch(() => {});
-  return work;
 }
 
 const fromLibrary = (sender) =>
@@ -241,6 +246,23 @@ async function dispatch(message, sender) {
   if (action === 'library:capture' || action === 'library:saveClip') {
     if (!fromXPage(sender)) throw new Error('Saving must start on X.');
     return transaction((state) => mutate(state, action.slice('library:'.length), payload));
+  }
+  if (['import:status', 'import:checkpoint', 'import:finish'].includes(action)) {
+    if (!fromXPage(sender)) throw new Error('Importing must start on X.');
+    return enqueue(async () => {
+      const state = await load();
+      if (action === 'import:status') return importStatus(state, payload.ids);
+      if (!validScope(payload.scope)) throw new Error('Invalid import scope.');
+      const checkpoints = (await chrome.storage.local.get(IMPORT_KEY))[IMPORT_KEY] || {};
+      if (action === 'import:checkpoint') {
+        const checkpoint = usableCheckpoint(state, checkpoints[payload.scope]);
+        // Page code needs only the boundary, never the historical list of IDs.
+        return checkpoint ? { head: checkpoint.head, startedAt: checkpoint.startedAt } : null;
+      }
+      const next = nextCheckpoints(state, checkpoints, payload);
+      if (next !== checkpoints) await chrome.storage.local.set({ [IMPORT_KEY]: next });
+      return {};
+    });
   }
   if (!fromLibrary(sender)) throw new Error('Open the Library to do this.');
   if (action === 'library:load') {

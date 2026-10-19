@@ -228,6 +228,125 @@ button {
   margin-top: 14px;
 }
 
+/* Bookmark import (X Bookmarks pages) */
+.sync {
+  padding-bottom: 4px;
+}
+
+.sync-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 4px 0 12px;
+  color: var(--text-primary);
+  font-size: 13px;
+  line-height: 1.45;
+  font-variant-numeric: tabular-nums;
+}
+
+.sync-status[hidden] {
+  display: none;
+}
+
+.sync-lead {
+  display: flex;
+  flex: none;
+  margin-top: 1px;
+  color: var(--accent-color);
+}
+
+.sync-lead:empty,
+.sync-more:empty,
+.sync-hint:empty {
+  display: none;
+}
+
+.sync-status[data-tone='success'] .sync-lead { color: var(--success-color); }
+.sync-status[data-tone='warning'] .sync-lead,
+.sync-status[data-tone='error'] .sync-lead { color: var(--danger-color); }
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--accent-tint);
+  border-top-color: var(--accent-color);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.sync-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.sync-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 700;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.sync-btn.primary {
+  flex: 1;
+  border-color: var(--accent-color);
+  background: var(--accent-color);
+  color: #ffffff;
+}
+
+.sync-btn.primary:hover {
+  background: var(--accent-strong);
+  border-color: var(--accent-strong);
+}
+
+.sync-btn.secondary {
+  flex: 1;
+}
+
+.sync-btn.secondary:hover {
+  background: var(--hover-bg);
+  border-color: var(--accent-color);
+  color: var(--accent-color);
+}
+
+.sync-btn.link {
+  height: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  color: var(--accent-color);
+  font-size: 13px;
+}
+
+.sync-btn.link:hover {
+  text-decoration: underline;
+}
+
+.sync-more,
+.sync-hint {
+  margin-top: 10px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation: none; }
+}
+
 /* Instant tooltip for icon buttons; anchored right so it stays inside the popup. */
 [data-tip] {
   position: relative;

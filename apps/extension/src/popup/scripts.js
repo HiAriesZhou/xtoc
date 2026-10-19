@@ -1,5 +1,7 @@
 // Popup entry point. Holds no state: it asks the content script what the
 // current X page is, then renders one of a few states.
+import { syncView } from './bookmark-sync.js';
+
 const REPOSITORY_URL = 'https://github.com/HiAriesZhou/xtoc';
 const X_PAGE = /^https:\/\/(x\.com|twitter\.com)\//;
 
@@ -18,6 +20,12 @@ const ICONS = {
   refresh:
     '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
   library: '<path d="m16 6 4 14"/><path d="M12 6v14"/><path d="M8 8v12"/><path d="M4 4v16"/>',
+  import:
+    '<path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/><path d="M12 7v6"/><path d="m9 10 3 3 3-3"/>',
+  pause: '<rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/>',
+  play: '<path d="M7 4v16l13-8z"/>',
+  stop: '<rect x="6" y="6" width="12" height="12" rx="2"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
   github:
     '<path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3.28-.36 6.72-1.61 6.72-7A5.4 5.4 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.4 5.4 0 0 0-1.42 2.73c0 5.42 3.44 6.66 6.72 7A4.8 4.8 0 0 0 9 18v4"/><path d="M9 18c-4.51 2-5-2-7-2"/>'
 };
@@ -114,6 +122,62 @@ function renderToc(toc) {
     </ul>`;
 }
 
+// Bookmarks pages: import controls instead of the "no article" notice.
+const SYNC_POLL_MS = 500;
+
+function syncLead(status, view) {
+  if (view.busy) return '<span class="spinner" aria-hidden="true"></span>';
+  if (status.phase === 'idle') return '';
+  if (status.phase === 'paused') return icon('pause');
+  return icon(view.tone === 'success' ? 'check' : view.tone === 'info' ? 'import' : 'error');
+}
+
+function renderSyncButton({ command, label, icon: name, variant }) {
+  const content = name ? `${icon(name)}<span>${label}</span>` : label;
+  return `<button class="sync-btn ${variant}" type="button" data-command="${command}">${content}</button>`;
+}
+
+// A fixed skeleton that updateSync fills in. Progress polls change only the
+// parts that differ: replacing a button between press and release would drop
+// the click, and replacing the spinner would restart it.
+const SYNC_SKELETON = `
+  <section class="sync" aria-label="Bookmark import">
+    <p class="sync-status" role="status" aria-live="polite" hidden><span class="sync-lead"></span><span class="sync-text"></span></p>
+    <div class="sync-actions"></div>
+    <p class="sync-more"></p>
+    <p class="sync-hint"></p>
+  </section>`;
+
+const renderedHtml = new WeakMap();
+
+function setHtml(element, html) {
+  if (renderedHtml.get(element) === html) return false;
+  element.innerHTML = html;
+  renderedHtml.set(element, html);
+  return true;
+}
+
+function setText(element, text) {
+  if (element.textContent !== text) element.textContent = text;
+}
+
+function updateSync(root, status) {
+  const view = syncView(status);
+  const line = root.querySelector('.sync-status');
+  line.hidden = !view.text;
+  line.dataset.tone = view.tone;
+  setHtml(root.querySelector('.sync-lead'), syncLead(status, view));
+  setText(root.querySelector('.sync-text'), view.text);
+  setText(root.querySelector('.sync-hint'), view.hint);
+  const focused = root.contains(document.activeElement) ? document.activeElement.dataset.command : null;
+  const buttons = (variant) => view.buttons.filter((button) => (button.variant === 'link') === variant)
+    .map(renderSyncButton).join('');
+  const replaced = [setHtml(root.querySelector('.sync-actions'), buttons(false)),
+    setHtml(root.querySelector('.sync-more'), buttons(true))];
+  if (focused && replaced.some(Boolean))
+    (root.querySelector(`[data-command="${focused}"]`) || root.querySelector('.sync-btn'))?.focus();
+}
+
 function bodyFor(page) {
   if (page.kind === 'unsupported') {
     return renderNotice({
@@ -129,6 +193,9 @@ function bodyFor(page) {
       text: 'XTOC starts with the page. Reload the tab, then open XTOC again.',
       action: `<button class="text-btn" id="reloadBtn" type="button">Reload tab</button>`
     });
+  }
+  if (page.kind === 'other' && page.bookmarkImport?.available) {
+    return `<div id="syncRoot">${SYNC_SKELETON}</div>`;
   }
   if (page.kind === 'other') {
     return renderNotice({
@@ -213,6 +280,30 @@ function bindActions(root, page, tabId) {
   });
   const save = root.querySelector('#saveBtn');
   if (save) bindSave(save, tabId);
+  const sync = root.querySelector('#syncRoot');
+  if (sync) bindSync(sync, tabId, page.bookmarkImport);
+}
+
+// Commands and progress go through the content script, which runs the same
+// import as the page control. Polling stops with the popup.
+function bindSync(container, tabId, initial) {
+  const show = (status) => updateSync(container, status);
+  show(initial);
+  const failed = (error) => show({ phase: 'done', tone: 'error', commands: [],
+    text: error?.message || 'Reload this tab, then try again.' });
+  const request = async (command) => {
+    const result = await chrome.tabs.sendMessage(tabId, { action: 'bookmarkImport', command });
+    if (!result?.ok) throw new Error(result?.error || 'Reload this tab, then try again.');
+    show(result.data);
+  };
+  container.addEventListener('click', (event) => {
+    const command = event.target.closest('[data-command]')?.dataset.command;
+    if (command) request(command).catch(failed);
+  });
+  const timer = setInterval(() => request().catch((error) => {
+    clearInterval(timer);
+    failed(error);
+  }), SYNC_POLL_MS);
 }
 
 async function describePage(tab) {
@@ -222,7 +313,8 @@ async function describePage(tab) {
     return {
       kind: response?.pageKind || 'other',
       toc: response?.toc || [],
-      isPanelVisible: Boolean(response?.isPanelVisible)
+      isPanelVisible: Boolean(response?.isPanelVisible),
+      bookmarkImport: response?.bookmarkImport
     };
   } catch {
     return { kind: 'unreachable' };
