@@ -2,7 +2,9 @@ import { importedBookmarks } from './model.js';
 
 export const IMPORT_KEY = 'xtocBookmarkImports';
 export const ANCHOR_SIZE = 5;
-const MAX_COVERED = 10000;
+// Covered IDs only validate a boundary (a deleted one invalidates it); the
+// newest are enough, so longer lists are trimmed rather than refused.
+export const MAX_COVERED = 10000;
 export const validScope = (scope) => typeof scope === 'string' &&
   /^@[a-z0-9_]{1,15}\/bookmarks(?:\/\d+)?$/.test(scope);
 const validIds = (ids, max) => Array.isArray(ids) && ids.length <= max &&
@@ -34,7 +36,7 @@ export function nextCheckpoints(state, checkpoints, payload) {
   if (previousStartedAt !== undefined) {
     const previous = usableCheckpoint(state, checkpoints[scope]);
     if (!previous || previous.startedAt !== previousStartedAt) return checkpoints;
-    covered = [...new Set([...covered, ...previous.covered])];
+    covered = [...new Set([...covered, ...previous.covered])].slice(0, MAX_COVERED);
   }
   const candidate = { version: 1, head, covered, startedAt };
   if (!usableCheckpoint(state, candidate)) return checkpoints;

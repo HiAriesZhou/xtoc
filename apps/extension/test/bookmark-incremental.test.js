@@ -364,3 +364,38 @@ test('a popup command runs the same import as the page control and reports its s
 test('a command that does not apply to the current phase is rejected', async () => {
   await assert.rejects(runPanel({ command: 'pause', state: readState(), posts: [1] }), /not available/);
 });
+
+// Build a large Library directly; capturing 10000 posts one by one is quadratic.
+const bulkState = (count) => {
+  const state = seeded(1);
+  const article = state.articles[id(1)];
+  const bookmark = state.bookmarks[id(1)];
+  for (let n = 2; n <= count; n++) {
+    state.articles[id(n)] = { ...article, id: id(n), canonicalUrl: `https://x.com/fixture/status/${n}` };
+    state.bookmarks[id(n)] = { ...bookmark, id: id(n) };
+  }
+  return state;
+};
+
+test('a boundary keeps the newest 10000 covered posts instead of refusing to save', () => {
+  const total = 10010;
+  const state = bulkState(total);
+  // Newest first, as the list is scanned: 10010 is the newest bookmark.
+  const newest = (from, length) => Array.from({ length }, (_, i) => id(from - i));
+  const previous = { version: 1, startedAt: 1, head: newest(total - 10, 5), covered: newest(total - 10, total - 10) };
+  const next = nextCheckpoints(state, { [scope]: previous },
+    { scope, startedAt: 2, head: newest(total, 5), covered: newest(total, 15), previousStartedAt: 1 });
+  assert.equal(next[scope].startedAt, 2);
+  assert.equal(next[scope].covered.length, 10000);
+  assert.deepEqual(next[scope].covered.slice(0, 5), newest(total, 5));
+  assert.ok(usableCheckpoint(state, next[scope]));
+});
+
+test('a long scan reports at most 10000 covered posts, newest first', () => {
+  const progress = importProgress(null);
+  for (let n = 1; n <= 10005; n++) progress.observe(id(n), true);
+  const checkpoint = progress.checkpoint(10, scope, false);
+  assert.equal(checkpoint.covered.length, 10000);
+  assert.deepEqual(checkpoint.head, [1, 2, 3, 4, 5].map(id));
+  assert.equal(checkpoint.covered[9999], id(10000));
+});

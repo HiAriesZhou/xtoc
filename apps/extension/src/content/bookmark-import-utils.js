@@ -1,3 +1,5 @@
+import { MAX_COVERED } from '../library/bookmark-import.js';
+
 // X moved Bookmarks from /i/bookmarks into a tab of /i/history. Both routes are
 // supported; the History page also has a Likes tab, so each post is checked.
 export function isBookmarksRoute(pathname) {
@@ -50,7 +52,7 @@ export function importProgress(checkpoint) {
     checkpoint(startedAt, scope, incremental) {
       if (failed || head.length < 5) return null;
       return { scope, startedAt, head,
-        covered: [...observed],
+        covered: [...observed].slice(0, MAX_COVERED),
         ...(incremental ? { previousStartedAt: checkpoint.startedAt } : {}) };
     }
   };

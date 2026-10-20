@@ -39,8 +39,20 @@ export interface XtocStorageShape {
   twitterTocExcerptSettings: XtocSettings;
   xtocLibraryItems: Record<string, XtocBookmark>;
   xtocAIPrefs: XtocAIPrefs;
+  xtocBookmarkImports: Record<string, XtocBookmarkImport>;
   tocPanelPosition: { x: number; y: number };
   tocPanelVisible: boolean;
+}
+
+// Where a repeat bookmark import may stop, keyed by scope ("@handle/bookmarks",
+// optionally "/<folderId>"). Never exported (see src/library/bookmark-import.js).
+export interface XtocBookmarkImport {
+  version: 1;
+  startedAt: number;
+  /** The 5 newest bookmark IDs of the last complete import. */
+  head: string[];
+  /** Up to 10000 imported bookmark IDs, newest first. */
+  covered: string[];
 }
 
 // The API key itself is never stored here (see src/library/key-vault.js).
