@@ -1,0 +1,40 @@
+{
+  "schema": "dashbye/lock/v1",
+  "version": "0.8.0",
+  "artifactSha256": "30995fc2a4420492cfee37a74d0a1510d72adec1fbf4ff8a75ddfad54908bb88",
+  "releaseHash": "6d3b836a3c2f58628b2745c63f7dea28b5851915e57a61624e3323b99f7f1e7a",
+  "manifest": {
+    "version": "0.8.0",
+    "name": "XTOC: Navigate & Clip X Articles",
+    "summary": "Navigate long X articles with a table of contents, and save posts, articles and passages to a local library you can export.",
+    "permissions": [
+      "activeTab",
+      "contextMenus",
+      "scripting",
+      "storage",
+      "unlimitedStorage"
+    ],
+    "optionalPermissions": [],
+    "hostPermissions": [
+      "https://twitter.com/*",
+      "https://x.com/*"
+    ],
+    "optionalHostPermissions": [
+      "https://*/*"
+    ],
+    "contentScriptMatches": [
+      "https://twitter.com/*",
+      "https://x.com/*"
+    ]
+  },
+  "resourceHashes": {
+    "assets/icon/icon-128.png": "6995d60d80251dd81bc8dbd3962704fd4fdfd6c97dd22cf682727bfd8d2e2a5d",
+    "assets/promo/marquee-1400x560.png": "dfaabb5aaed689d2e59202b962c4397522f928af52570bf794de3a17304d1479",
+    "assets/promo/small-440x280.png": "27d9f01328573c18ee6861a62d5279e63aeee4f91d5740036286cba003ede6dc",
+    "assets/screenshots/01-x-toc-1280x800.png": "c8293c3cc1a3215c84d1a1273acd9f7a40d62290f447669f66ef07776a7cdf3d",
+    "assets/screenshots/02-bookmarks-1280x800.png": "3ad4c22f9fa8a841b79b3c23c9065cc65d7c6973fc168db1979211f0d5fddccb",
+    "assets/screenshots/03-export-1280x800.png": "d2ff8d23fe3cf675ec150047da2f669f06059eac7e056812db226e9e5e6850cb",
+    "listing/en/description.txt": "addb06eb1aa824c3b4aeb7b298530a3782f7892f92a481bbb8d1cff152d2fb64"
+  },
+  "recordedAt": "2026-10-20T03:03:53.920Z"
+}

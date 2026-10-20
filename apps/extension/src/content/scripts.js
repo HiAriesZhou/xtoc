@@ -15,7 +15,7 @@ import { createLifecycle } from './lifecycle.js';
 
 const TOC_SCROLL_OFFSET = 70;
 
-let destroyLibraryCapture = null;
+let bookmarkImport = null;
 let pageObserver = null;
 let initialExtractTimeout = null;
 let active = true; // false once this instance is torn down
@@ -61,7 +61,7 @@ function scrollToHeader(index) {
 
 // Initialize
 async function init() {
-  destroyLibraryCapture = initBookmarkImport();
+  bookmarkImport = initBookmarkImport();
   // Wait for page to fully load
   initialExtractTimeout = setTimeout(() => {
     refreshTOC();
@@ -111,12 +111,23 @@ function handleMessage(message, sender, sendResponse) {
     );
     return true;
   }
+  if (message.action === 'bookmarkImport') {
+    // Without a command this only reports progress (the popup polls it).
+    try {
+      const status = message.command ? bookmarkImport.perform(message.command) : bookmarkImport.status();
+      sendResponse({ ok: true, data: status });
+    } catch (error) {
+      sendResponse({ ok: false, error: error.message });
+    }
+    return true;
+  }
   if (message.action === 'getTOC') {
     refreshTOC();
     sendResponse({
       toc: tocData,
       isPanelVisible: tocPanel?.isVisible || false,
-      pageKind: getPageKind()
+      pageKind: getPageKind(),
+      bookmarkImport: bookmarkImport?.status()
     });
   } else if (message.action === 'scrollTo') {
     scrollToHeader(message.index);
@@ -148,7 +159,7 @@ function teardown() {
   pageObserver?.disconnect();
   tocPanel?.destroy();
   destroyExcerptFeature();
-  destroyLibraryCapture?.();
+  bookmarkImport?.destroy();
   try {
     chrome.runtime.onMessage.removeListener(handleMessage);
   } catch {

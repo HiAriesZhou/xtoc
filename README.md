@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/HiAriesZhou/xtoc/releases"><img src="https://img.shields.io/badge/version-0.7.0-blue" alt="Version 0.7.0"></a>
+  <a href="https://github.com/HiAriesZhou/xtoc/releases"><img src="https://img.shields.io/badge/version-0.8.0-blue" alt="Version 0.8.0"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License"></a>
   <a href="https://chromewebstore.google.com/detail/nbdgpckkcfkomnmdefinikjijgljgjfp?utm_source=item-share-cb"><img src="https://img.shields.io/chrome-web-store/size/nbdgpckkcfkomnmdefinikjijgljgjfp" alt="Chrome Web Store"></a>
 </p>
@@ -46,6 +46,7 @@ Watch the 40-second demo: navigate an article, save passages, edit tags and note
 - **Article navigation** — heading detection for X.com and Twitter.com long-form articles, in the popup or a draggable floating table of contents that remembers its position.
 - **Clips** — select text and save it locally with one click, together with its article, author when available, timestamps and surrounding context.
 - **Bookmarks** — save the current article or post with **Save to Bookmarks** in the popup, or import from your X Bookmarks page. Imports only read loaded previews and never change your X bookmarks.
+  Repeat imports can stop at the previous import for the same account and list. **Scan all bookmarks** in the import menu checks older bookmarks too. The first run, an unrecognized list, or an invalid import record requires a full scan; page loading failures can still require a retry. On the Bookmarks page, the XTOC popup offers the same import controls and progress, so you can start again after closing the import bar. Keep the tab visible while importing; it waits while the tab is in the background.
 - **No reload after updates** — X tabs that were already open keep working when XTOC is installed or updated.
 
 Open **Library** from the popup or the pinned contents panel. It has three pages:
@@ -90,7 +91,7 @@ npm run build:firefox
 npm run build:edge
 ```
 
-For day-to-day debugging, `npm run build:dev` additionally writes `dist/chromium-dev`: the same build renamed **XTOC (Development)** with an orange, striped toolbar icon, so it is easy to tell apart from the store version. Load that folder instead of `dist/chromium`; it gets its own extension ID and local storage. Release ZIPs always use the unbranded builds.
+For day-to-day debugging, `npm run build:dev` additionally writes `dist/chromium-dev` at the repository root (other builds stay in `apps/extension/dist/`): the same build renamed **XTOC (Development)** with an orange, striped toolbar icon, so it is easy to tell apart from the store version. Load that folder instead of `dist/chromium`; it gets its own extension ID and local storage, which stay with that folder path, so later `build:dev` runs update it in place. Release ZIPs always use the unbranded builds.
 
 `npm run build:zip` builds all three targets and writes the store packages to `release/`: `xtoc-chrome-v<version>.zip`, `xtoc-edge-v<version>.zip`, `xtoc-firefox-v<version>.zip`, plus `xtoc-source-v<version>.zip` (the committed source, for Firefox Add-ons review). Commit first; the source archive is skipped when there are uncommitted extension changes.
 
@@ -98,7 +99,7 @@ Chrome, Edge and Firefox are available from their respective stores. Chromium, F
 
 ## Privacy
 
-Saved text, clips, tags, notes and settings remain in `chrome.storage.local`; the `unlimitedStorage` permission keeps saved article bodies from hitting the default local quota and grants no site access. The `scripting` permission lets XTOC restart itself in X tabs that were already open when it is installed or updated, so they work without a reload; it adds no sites beyond X/Twitter. Exports are user-triggered downloads. Optional AI sends one bookmark's saved text and your tag names directly to the configured provider, only when you ask. AI host access is requested for that provider only; page scripts remain limited to X/Twitter. The API key lives in extension session storage, or, if you choose **Remember on this device**, encrypted (AES-GCM, non-extractable browser key) in the extension's IndexedDB; this keeps it out of plain-text files but does not protect against someone who controls the device. It is never synced, exported or saved with your library. **Remove key** deletes it everywhere and revokes that provider permission. There is no telemetry, X credential collection, cloud library storage or automatic upload.
+Saved text, clips, tags, notes, settings and bookmark import progress (your X handle and recent bookmark IDs, so repeat imports can stop early) remain in `chrome.storage.local`; the `unlimitedStorage` permission keeps saved article bodies from hitting the default local quota and grants no site access. The `scripting` permission lets XTOC restart itself in X tabs that were already open when it is installed or updated, so they work without a reload; it adds no sites beyond X/Twitter. Exports are user-triggered downloads. Optional AI sends one bookmark's saved text and your tag names directly to the configured provider, only when you ask. AI host access is requested for that provider only; page scripts remain limited to X/Twitter. The API key lives in extension session storage, or, if you choose **Remember on this device**, encrypted (AES-GCM, non-extractable browser key) in the extension's IndexedDB; this keeps it out of plain-text files but does not protect against someone who controls the device. It is never synced, exported or saved with your library. **Remove key** deletes it everywhere and revokes that provider permission. There is no telemetry, X credential collection, cloud library storage or automatic upload.
 
 ## Project links
 

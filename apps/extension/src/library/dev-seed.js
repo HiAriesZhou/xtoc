@@ -1,7 +1,7 @@
 import { cleanArticle, cleanClip } from './model.js';
 
 // Sample data for local development builds only. The data file is copied into
-// dist/chromium-dev by tooling/build-dev.mjs and never ships in a release, and
+// the dev build (<repo>/dist/chromium-dev) by tooling/build-dev.mjs and never ships in a release, and
 // every sample ID carries this prefix so removal cannot touch real records.
 export const SEED_PREFIX = 'mock_';
 export const SEED_PATH = 'dev/seed.json';

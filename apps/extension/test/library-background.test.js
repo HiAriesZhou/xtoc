@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 let listener;
 let failWrite = false;
+let localWrites = 0;
 let local = {},
   session = {};
 const area = (ref) => ({
@@ -18,6 +19,7 @@ const area = (ref) => ({
   async set(data) {
     await new Promise((r) => setTimeout(r, 1));
     if (failWrite && ref() === local) throw new Error('QUOTA');
+    if (ref() === local) localWrites++;
     Object.assign(ref(), structuredClone(data));
   },
   async remove(key) {
@@ -87,6 +89,45 @@ test('content scripts cannot read the library, configure AI, edit or delete', as
     (await call('library:capture', {}, { ...content, url: 'https://x.com.evil.test/' })).ok,
     false
   );
+});
+
+test('import status is bounded and scoped; duplicate imports avoid storage writes', async () => {
+  const payload = {
+    article: { id: 'article_900', canonicalUrl: 'https://x.com/example/status/900', title: 'Fixture' },
+    bookmark: { markdown: 'Saved preview', fromXBookmarks: true, sortKey: 900 }
+  };
+  assert.equal((await call('library:capture', payload, content)).ok, true);
+  const before = structuredClone(local);
+  const writesBefore = localWrites;
+  const status = await call('import:status', { ids: ['article_900', 'article_901'] }, content);
+  assert.deepEqual(status.data, [{ id: 'article_900', ready: true }, { id: 'article_901', ready: false }]);
+  assert.equal((await call('library:capture', payload, content)).data.duplicate, true);
+  assert.deepEqual(local, before);
+  assert.equal(localWrites, writesBefore);
+  for (const action of ['import:status', 'import:checkpoint', 'import:finish']) {
+    assert.equal((await call(action, {}, { ...content, url: 'https://example.com/' })).ok, false);
+  }
+  assert.equal((await call('import:status', { ids: Array(101).fill('article_900') }, content)).ok, false);
+  assert.equal((await call('import:checkpoint', { scope: '__proto__' }, content)).ok, false);
+});
+
+test('import boundaries persist separately and local deletion invalidates them', async () => {
+  const ids = [];
+  for (let n = 910; n < 915; n++) {
+    ids.push(`article_${n}`);
+    assert.equal((await call('library:capture', {
+      article: { id: `article_${n}`, canonicalUrl: `https://x.com/example/status/${n}`, title: 'Fixture' },
+      bookmark: { markdown: 'Saved preview', fromXBookmarks: true, sortKey: n }
+    }, content)).ok, true);
+  }
+  const scope = '@fixture/bookmarks';
+  assert.equal((await call('import:finish', { scope, head: ids, covered: ids, startedAt: 1 }, content)).ok, true);
+  assert.deepEqual((await call('import:checkpoint', { scope }, content)).data.head, ids);
+  assert.equal((await call('import:checkpoint', { scope }, content)).data.covered, undefined);
+  assert.equal((await call('import:checkpoint', { scope: '@other/bookmarks' }, content)).data, null);
+  assert.equal((await call('library:load')).data.xtocBookmarkImports, undefined);
+  await call('library:delete', { type: 'bookmark', ids: [ids[4]] });
+  assert.equal((await call('import:checkpoint', { scope }, content)).data, null);
 });
 test('failed storage write is non-destructive and does not poison subsequent transactions', async () => {
   const before = structuredClone(local);

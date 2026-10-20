@@ -50,3 +50,10 @@ test('dev build seed path matches the runtime path and is absent from src', asyn
   assert.equal(DEV_SEED_TARGET, SEED_PATH);
   assert.equal(existsSync(`src/${SEED_PATH}`), false);
 });
+
+test('dev build goes to the repository root dist inside the monorepo, else next to the package', async () => {
+  const { devBuildDir } = await import('../tooling/build-dev.mjs');
+  assert.equal(devBuildDir('/work/xtoc/apps/extension'), '/work/xtoc/dist/chromium-dev');
+  assert.equal(devBuildDir('/review/xtoc-source'), '/review/xtoc-source/dist/chromium-dev');
+  assert.equal(devBuildDir('/work/other/apps/web'), '/work/other/apps/web/dist/chromium-dev');
+});

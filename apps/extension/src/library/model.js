@@ -194,6 +194,13 @@ function sortKeyFor(old, incoming, time) {
 }
 
 function capture(state, payload, time) {
+  // A repeated bookmark-page preview must not rewrite an already usable record.
+  // Manual captures still refresh the saved text; incomplete imports can be repaired.
+  if (payload.bookmark?.fromXBookmarks) {
+    const article = cleanArticle(payload.article);
+    const existing = importedBookmarks(state).get(contentId(article.canonicalUrl));
+    if (existing?.ready) return { duplicate: true, id: existing.id };
+  }
   const { id } = upsertArticle(state, payload, time);
   const old = state.bookmarks[id];
   const input = cleanBookmark({ ...payload.bookmark, capturedAt: time, updatedAt: time }, id);
@@ -210,6 +217,22 @@ function capture(state, payload, time) {
     updatedAt: time
   };
   return { duplicate: Boolean(old), id };
+}
+
+// Match canonical sources, including records whose legacy ID differs from contentId.
+export function importedBookmarks(state) {
+  const items = new Map();
+  for (const [id, bookmark] of Object.entries(state.bookmarks)) {
+    const article = state.articles[id];
+    const url = xUrl(article?.canonicalUrl || article?.url);
+    if (!url) continue;
+    items.set(contentId(url), {
+      id,
+      ready: Boolean(bookmark.fromXBookmarks && bookmark.markdown?.trim() &&
+        article.title && Number.isFinite(bookmark.sortKey))
+    });
+  }
+  return items;
 }
 
 function saveClip(state, payload, time) {
