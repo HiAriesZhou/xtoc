@@ -14,4 +14,5 @@ targets:
     language: English – en (default)
   firefox:
     artifact: release/xtoc-firefox-v0.8.0.zip
+    source: release/xtoc-source-v0.8.0.zip
     addon: xtoc@arieszhou.com

@@ -1,0 +1,3 @@
+The uploaded source archive is a git archive of the extension directory (apps/extension in https://github.com/HiAriesZhou/xtoc).
+Build with Node 22: npm ci && npm run build:firefox
+The output in dist/firefox matches the uploaded package. Extension.js bundles each entry; there is no remote code.
