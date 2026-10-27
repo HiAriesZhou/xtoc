@@ -71,7 +71,7 @@ function renderHeader(pinState, canSave) {
     ? iconButton({
         id: 'pinBtn',
         name: pinState.visible ? 'unpin' : 'pin',
-        label: pinState.visible ? 'Unpin contents' : 'Pin beside article',
+        label: pinState.visible ? 'Close pop-out contents' : 'Pop out contents',
         extraClass: pinState.visible ? 'active' : ''
       })
     : '';
@@ -121,6 +121,12 @@ function renderToc(toc) {
         .join('')}
     </ul>`;
 }
+
+// Shown only after the reader hid the contents beside articles.
+const renderInlineTocOff = () => `
+  <p class="muted-line inline-toc-off">Contents are hidden beside articles.
+    <button class="text-btn" id="showInlineTocBtn" type="button">Show again</button>
+  </p>`;
 
 // Bookmarks pages: import controls instead of the "no article" notice.
 const SYNC_POLL_MS = 500;
@@ -210,7 +216,7 @@ function bodyFor(page) {
   const contents = page.toc.length
     ? renderToc(page.toc)
     : '<p class="muted-line">No section headings found in this article yet.</p>';
-  return contents;
+  return page.inlineTocOff ? `${renderInlineTocOff()}${contents}` : contents;
 }
 
 function render(root, page) {
@@ -267,6 +273,10 @@ function bindActions(root, page, tabId) {
     chrome.tabs.reload(tabId);
     window.close();
   });
+  root.querySelector('#showInlineTocBtn')?.addEventListener('click', async () => {
+    await chrome.tabs.sendMessage(tabId, { action: 'setTocPrefs', prefs: { autoShow: true } });
+    window.close();
+  });
   root.querySelector('#pinBtn')?.addEventListener('click', async () => {
     await chrome.tabs.sendMessage(tabId, { action: 'togglePanel' });
     window.close();
@@ -314,6 +324,7 @@ async function describePage(tab) {
       kind: response?.pageKind || 'other',
       toc: response?.toc || [],
       isPanelVisible: Boolean(response?.isPanelVisible),
+      inlineTocOff: response?.inlineToc?.autoShow === false,
       bookmarkImport: response?.bookmarkImport
     };
   } catch {

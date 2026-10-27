@@ -1,0 +1,103 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>XTOC local layout fixture</title>
+<!-- Synthetic X article layout for the inline contents journey. Geometry, colors and the
+     right column's scroll-direction sticky behavior follow measurements of x.com. On a
+     /status/ route it renders the three-column layout; on /article/ the Focus mode column.
+     ?theme=dark switches to Lights out. The column is removed at 1000px and below and
+     rebuilt from scratch above it, as X does. -->
+<style>
+  :root { color-scheme: light; --bg: rgb(255,255,255); --text: rgb(15,20,25); --muted: rgb(83,100,113); --border: rgb(239,243,244); --accent: rgb(29,155,240); }
+  :root.dark { color-scheme: dark; --bg: rgb(0,0,0); --text: rgb(231,233,234); --muted: rgb(113,118,123); --border: rgb(47,51,54); }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/20px -apple-system, "Segoe UI", sans-serif; }
+  .layout { display: flex; justify-content: center; }
+  header[role="banner"] { width: 275px; }
+  [data-testid="primaryColumn"] { width: 600px; border-inline: 1px solid var(--border); }
+  [data-testid="sidebarColumn"] { width: 350px; margin-left: 30px; }
+  .focus [data-testid="twitterArticleReadView"] { width: 700px; margin: 56px auto 0; }
+  [data-testid="twitterArticleReadView"] { padding: 0 16px; }
+  h1 { font-size: 40px; line-height: 48px; }
+  h2 { font-size: 24px; line-height: 30px; margin-top: 40px; }
+  p { font-size: 17px; line-height: 28px; }
+  #sidebarSlot { display: flex; }
+  .rel { position: relative; height: 100%; }
+  .search { position: fixed; top: 0; width: 350px; height: 53px; background: var(--bg); z-index: 2; display: flex; align-items: center; }
+  .search input { width: 100%; height: 40px; border: 1px solid var(--border); border-radius: 999px; background: var(--bg); color: var(--text); padding: 0 16px; }
+  .spacer { height: 65px; } /* x.com: 53px under the search bar plus a 12px inset */
+  .module { border: 1px solid var(--border); border-radius: 16px; margin: 0 0 16px; padding: 12px 16px; }
+  .module h2 { margin: 0 0 12px; font-size: 20px; font-weight: 800; line-height: 24px; }
+  .trend { padding: 12px 0; }
+  .trend small { color: var(--muted); font-size: 13px; }
+  .trend a { color: var(--accent); text-decoration: none; }
+  nav[aria-label="Footer"] { color: var(--muted); font-size: 13px; padding: 0 16px 16px; }
+</style>
+<body>
+<div id="app"></div>
+<script>
+  if (new URLSearchParams(location.search).get('theme') === 'dark') document.documentElement.classList.add('dark');
+  const focus = /\/article\/\d+/.test(location.pathname);
+  const sections = ['Why structure matters', 'Reading with a map', 'Where sections begin', 'Keeping your place', 'Returning to a passage', 'What stays local'];
+  const filler = 'This synthetic paragraph exists only to give the fixture article enough height to scroll through several sections while the right column keeps its own position. ';
+  const article = `<article><div data-testid="twitterArticleReadView">
+    <h1 data-testid="twitter-article-title">A synthetic long-form article</h1>
+    <div data-testid="longformRichTextComponent">
+      ${sections.map((title, i) => `<h2 class="longform-header-one" id="s${i}">${title}</h2>${`<p>${filler.repeat(5)}</p>`.repeat(4)}`).join('')}
+    </div></div></article>`;
+  const app = document.getElementById('app');
+  if (focus) {
+    app.className = 'focus';
+    app.innerHTML = article;
+  } else {
+    app.className = 'layout';
+    app.innerHTML = `<header role="banner"></header><main role="main"><div data-testid="primaryColumn">${article}</div></main><div id="sidebarSlot"></div>`;
+  }
+
+  // X's right column scrolls both ways: scrolling down it stops when its bottom edge reaches the
+  // viewport bottom (top: viewport - height); scrolling up it stops when its top edge reaches the
+  // viewport top (bottom: viewport - height). On a direction change a spacer before it takes its
+  // current offset, so it continues from where it is instead of jumping.
+  function buildSidebar() {
+    const column = document.createElement('div');
+    column.dataset.testid = 'sidebarColumn';
+    column.innerHTML = `<div class="rel"><div class="lead"></div><div class="sticky" style="position: sticky; bottom: 0px;"><div><div><div class="list">
+      <div class="search"><input aria-label="Search query" placeholder="Search"></div>
+      <div class="spacer"></div>
+      <div class="module"><aside aria-label="Relevant people"><h2>Relevant people</h2><p>Fixture Author</p><p>@xtoc_fixture</p></aside></div>
+      <div class="module"><section><h2>What's happening</h2>${['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon'].map((t) => `<div class="trend"><small>Trending</small><div><b>${t}</b></div><a href="/explore">Show</a></div>`).join('')}</section></div>
+      <nav aria-label="Footer">Terms · Privacy · Cookies</nav>
+    </div></div></div></div></div>`;
+    const wrapper = column.firstElementChild;
+    const lead = column.querySelector('.lead');
+    const sticky = column.querySelector('.sticky');
+    const list = column.querySelector('.list');
+    const search = column.querySelector('.search');
+    let lastY = scrollY;
+    let wasDown = false;
+    const place = () => {
+      const height = list.offsetHeight;
+      wrapper.style.minHeight = `${height}px`;
+      const offset = Math.min(0, innerHeight - height);
+      const goingDown = scrollY > lastY || (scrollY === lastY && wasDown);
+      if (goingDown !== wasDown) {
+        lead.style.height = `${Math.max(0, sticky.getBoundingClientRect().top - wrapper.getBoundingClientRect().top)}px`;
+      }
+      sticky.setAttribute('style', `position: sticky; ${goingDown ? 'top' : 'bottom'}: ${offset}px;`);
+      wasDown = goingDown;
+      lastY = scrollY;
+      search.style.left = `${column.getBoundingClientRect().left}px`;
+    };
+    addEventListener('scroll', place, { passive: true });
+    new ResizeObserver(place).observe(list);
+    requestAnimationFrame(place);
+    return column;
+  }
+
+  function syncSidebar() {
+    if (focus) return;
+    const slot = document.getElementById('sidebarSlot');
+    const wide = innerWidth > 1000;
+    if (wide && !slot.firstChild) slot.appendChild(buildSidebar());
+    if (!wide && slot.firstChild) slot.firstChild.remove();
+  }
+  syncSidebar();
+  addEventListener('resize', syncSidebar);
+</script>
+</body></html>

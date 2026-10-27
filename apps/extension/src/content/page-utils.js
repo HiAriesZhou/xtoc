@@ -1,7 +1,9 @@
 // DOM and extension-context helpers shared by the content-script features.
 export function isExtensionElement(element) {
   return Boolean(
-    element?.closest?.('#twitter-toc-panel') || element?.closest?.('#xtoc-save-excerpt-button')
+    element?.closest?.('#twitter-toc-panel') ||
+      element?.closest?.('#xtoc-save-excerpt-button') ||
+      element?.closest?.('#xtoc-inline-toc')
   );
 }
 

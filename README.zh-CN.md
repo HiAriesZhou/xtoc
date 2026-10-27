@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/HiAriesZhou/xtoc/releases"><img src="https://img.shields.io/badge/version-0.8.0-blue" alt="Version 0.8.0"></a>
+  <a href="https://github.com/HiAriesZhou/xtoc/releases"><img src="https://img.shields.io/badge/version-0.9.0-blue" alt="Version 0.9.0"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License"></a>
   <a href="https://chromewebstore.google.com/detail/nbdgpckkcfkomnmdefinikjijgljgjfp?utm_source=item-share-cb"><img src="https://img.shields.io/chrome-web-store/size/nbdgpckkcfkomnmdefinikjijgljgjfp" alt="Chrome Web Store"></a>
 </p>
@@ -37,23 +37,23 @@ https://github.com/user-attachments/assets/b107995f-3b2a-4432-9530-48a93c886aa3
 
 ## 使用方式
 
-1. **浏览文章。** 打开 Popup 查看识别出的标题，跳到指定章节，或把可移动的目录固定在文章旁边。
+1. **浏览文章。** 打开长文后，目录直接出现在 X 右侧栏的推荐模块上方，阅读时始终可见；Focus mode 下显示在正文旁边。可在目录或 Popup 中跳到任意章节。
 2. **保存原句。** 选中文字并点击 `save to xtoc`。XTOC 会在本地保存原文、所属文章、可识别到的作者、时间和前后文。
 3. **整理并导出。** 在 Library 中搜索摘录、添加标签或笔记、删除内容，并将全部或选中摘录导出为 Markdown 或 JSON。
 
 ## 功能
 
-- **文章导航**：识别 X.com 和 Twitter.com 长文的标题，可在 Popup 或可拖动的浮动目录中跳转章节，浮动目录会记住位置。
+- **文章导航**：识别 X.com 和 Twitter.com 长文的标题。有两个及以上章节的长文会显示一个低调的目录模块，跟随 X 的 Default 或 Lights out 主题和强调色，高亮当前章节，可折叠为一行。通过它的菜单可以弹出为可拖动、会记住位置的浮动目录，或在长文中隐藏（可在 Popup 或 **Settings** 中重新开启）。窗口较窄、X 不显示右侧栏时不显示目录模块，可改用 Popup 或浮动目录。
 - **摘录**：选中文字一键保存到本地，同时记录所属文章、可识别到的作者、时间和前后文。
 - **书签**：在 Popup 点击 **Save to Bookmarks** 保存当前文章或帖子，或从 X 书签页导入。导入只读取已加载的预览，不会修改你的 X 书签。
   再次导入时，可在同一账号、同一列表的上次导入位置停止；在导入菜单中选择 **Scan all bookmarks** 可检查更早的书签。首次导入、无法识别列表或导入记录失效时会完整扫描；页面加载失败时仍可能需要重试。在书签页打开 XTOC 弹窗，也能使用同样的导入按钮并查看进度，关闭导入条后仍可从这里重新开始。导入时请保持该标签页可见；标签页在后台时导入会暂停等待。
 - **更新后无需刷新**：安装或更新 XTOC 后，已打开的 X 标签页可以直接继续使用。
 
-从 Popup 或浮动目录打开 **Library**，包含三个页面：
+从 Popup 或目录菜单打开 **Library**，包含三个页面：
 
 - **Clips**：搜索、标注、删除和导出已保存的摘录。
 - **Bookmarks**：搜索、标注、删除和导出已保存的文章和帖子。
-- **Settings**：可选的 AI 设置和本地存储用量。
+- **Settings**：文章目录显示、可选的 AI 设置和本地存储用量。
 
 Clips 和书签可导出为 Obsidian 风格的 Markdown：ZIP 中每篇文章或帖子一个笔记，带 YAML 属性和标签，摘录以引用 callout 呈现。Clips 也可导出为 JSON v1。可以导出全部，也可以只导出选中的内容。
 

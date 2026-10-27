@@ -42,6 +42,14 @@ export interface XtocStorageShape {
   xtocBookmarkImports: Record<string, XtocBookmarkImport>;
   tocPanelPosition: { x: number; y: number };
   tocPanelVisible: boolean;
+  xtocTocPrefs: XtocTocPrefs;
+}
+
+// Inline article contents display (src/library/toc-prefs.js). Panel UI state,
+// written by the content script and the Settings page; never exported.
+export interface XtocTocPrefs {
+  autoShow: boolean; // show the contents module on articles (default true)
+  collapsed: boolean; // module collapsed to its header (default false)
 }
 
 // Where a repeat bookmark import may stop, keyed by scope ("@handle/bookmarks",

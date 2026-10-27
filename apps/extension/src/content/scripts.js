@@ -1,9 +1,15 @@
 // Content script entry on x.com / twitter.com: wires the TOC panel, the
 // selection clip flow and the bookmark import, and handles popup messages.
 import { areTocEntriesEqual, clampScrollTarget } from './navigation-utils.js';
-import { isExtensionMutation } from './page-utils.js';
+import {
+  isExtensionContextAvailable,
+  isExtensionContextError,
+  isExtensionMutation
+} from './page-utils.js';
 import { extractTOC, getPageKind } from './toc-extract.js';
 import { TOCPanel } from './toc-panel.js';
+import { INLINE_TOC_ID, InlineToc } from './toc-inline.js';
+import { TOC_PREFS_KEY, normalizeTocPrefs } from '../library/toc-prefs.js';
 import {
   destroyExcerptFeature,
   handleExcerptRouteChange,
@@ -22,12 +28,82 @@ let active = true; // false once this instance is torn down
 let tocData = [];
 let headerElements = [];
 let tocPanel = null;
+let inlineToc = null;
+let tocPrefs = normalizeTocPrefs();
+let resizeFrame = null;
+const pendingPrefWrites = new Set(); // this tab's writes, to skip their echoes
+
+const RECONNECT_MESSAGE = 'Reload this page to reconnect XTOC.';
 
 function refreshTOC() {
   const { toc, headers } = extractTOC();
   tocData = toc;
   headerElements = headers;
   return toc;
+}
+
+// The inline contents follows the page: it appears on articles with sections,
+// moves with X's layout and steps aside while the floating panel is open.
+function syncInlineToc() {
+  if (!active || !inlineToc) return;
+  inlineToc.update({
+    toc: tocData,
+    pageKind: getPageKind(),
+    prefs: tocPrefs,
+    poppedOut: Boolean(tocPanel?.isVisible)
+  });
+}
+
+// Writes only the changed fields over the stored value, so a change made in
+// Settings or another tab meanwhile is kept.
+async function saveTocPrefs(patch) {
+  tocPrefs = { ...tocPrefs, ...patch };
+  if (!isExtensionContextAvailable()) {
+    inlineToc?.showStatus(RECONNECT_MESSAGE);
+    return;
+  }
+  try {
+    const stored = await chrome.storage.local.get(TOC_PREFS_KEY);
+    const next = normalizeTocPrefs({ ...stored[TOC_PREFS_KEY], ...patch });
+    const serialized = JSON.stringify(next);
+    // Storage reports no change for an identical value, so only a real change has an echo.
+    const current = stored[TOC_PREFS_KEY];
+    if (current && serialized === JSON.stringify(normalizeTocPrefs(current))) return;
+    pendingPrefWrites.add(serialized);
+    await chrome.storage.local.set({ [TOC_PREFS_KEY]: next });
+  } catch (error) {
+    if (isExtensionContextError(error)) inlineToc?.showStatus(RECONNECT_MESSAGE);
+    else console.error('[XTOC] Saving contents preferences failed:', error);
+  }
+}
+
+function handleStorageChange(changes, area) {
+  if (area !== 'local' || !changes[TOC_PREFS_KEY]) return;
+  const next = normalizeTocPrefs(changes[TOC_PREFS_KEY].newValue);
+  // An echo of this tab's own write is older than its current state.
+  if (pendingPrefWrites.delete(JSON.stringify(next))) return;
+  tocPrefs = next;
+  syncInlineToc();
+}
+
+function openLibrary() {
+  if (isExtensionContextAvailable()) tocPanel.openClips();
+  else inlineToc?.showStatus(RECONNECT_MESSAGE);
+}
+
+function handleResize() {
+  if (resizeFrame) return;
+  resizeFrame = requestAnimationFrame(() => {
+    resizeFrame = null;
+    syncInlineToc();
+  });
+}
+
+function showFloatingPanel() {
+  refreshTOC();
+  tocPanel.show(tocData);
+  tocPanel.persistLocalState({ tocPanelVisible: true });
+  tocPanel.focusCurrent();
 }
 
 const tocTitle = () =>
@@ -44,6 +120,7 @@ function scrollToHeader(index) {
     const targetScroll = clampScrollTarget(rect.top + scrollTop - TOC_SCROLL_OFFSET, maximumScroll);
 
     if (tocPanel?.isVisible) tocPanel.startNavigation(index, targetScroll);
+    inlineToc?.startNavigation(index, targetScroll);
 
     window.scrollTo({
       top: targetScroll,
@@ -65,17 +142,35 @@ async function init() {
   // Wait for page to fully load
   initialExtractTimeout = setTimeout(() => {
     refreshTOC();
+    syncInlineToc();
   }, 1500);
 
   // Initialize TOC Panel
-  tocPanel = new TOCPanel({ getHeaders: () => headerElements, onSelect: scrollToHeader });
+  tocPanel = new TOCPanel({
+    getHeaders: () => headerElements,
+    onSelect: scrollToHeader,
+    onVisibilityChange: syncInlineToc
+  });
   await tocPanel.init();
   if (!active) return tocPanel.destroy();
+  inlineToc = new InlineToc({
+    getHeaders: () => headerElements,
+    onSelect: scrollToHeader,
+    onCollapse: (collapsed) => saveTocPrefs({ collapsed }),
+    onPopOut: showFloatingPanel,
+    onOpenLibrary: openLibrary,
+    onHide: () => saveTocPrefs({ autoShow: false }),
+    onSettled: syncInlineToc
+  });
   initExcerptFeature({ getTocTitle: tocTitle });
 
   // Check if panel was visible before
-  const storage = await chrome.storage.local.get('tocPanelVisible');
+  const storage = await chrome.storage.local.get(['tocPanelVisible', TOC_PREFS_KEY]);
   if (!active) return;
+  tocPrefs = normalizeTocPrefs(storage[TOC_PREFS_KEY]);
+  chrome.storage.onChanged.addListener(handleStorageChange);
+  window.addEventListener('resize', handleResize);
+  syncInlineToc();
   if (storage.tocPanelVisible && tocData.length > 0) {
     tocPanel.show(tocData);
   }
@@ -92,6 +187,7 @@ async function init() {
       if (tocPanel.isVisible && tocChanged) {
         tocPanel.show(nextToc);
       }
+      syncInlineToc();
     }, 1000);
   });
 
@@ -126,6 +222,7 @@ function handleMessage(message, sender, sendResponse) {
     sendResponse({
       toc: tocData,
       isPanelVisible: tocPanel?.isVisible || false,
+      inlineToc: { autoShow: tocPrefs.autoShow, shown: Boolean(inlineToc?.isMounted) },
       pageKind: getPageKind(),
       bookmarkImport: bookmarkImport?.status()
     });
@@ -143,6 +240,15 @@ function handleMessage(message, sender, sendResponse) {
   } else if (message.action === 'hidePanel') {
     tocPanel.hide();
     sendResponse({ isVisible: false });
+  } else if (message.action === 'setTocPrefs') {
+    const patch = {};
+    for (const key of ['autoShow', 'collapsed']) {
+      if (typeof message.prefs?.[key] === 'boolean') patch[key] = message.prefs[key];
+    }
+    saveTocPrefs(patch).then(() => {
+      syncInlineToc();
+      sendResponse({ ok: true, prefs: tocPrefs });
+    });
   }
 
   return true;
@@ -158,17 +264,26 @@ function teardown() {
   clearTimeout(window.tocExtractTimeout);
   pageObserver?.disconnect();
   tocPanel?.destroy();
+  inlineToc?.destroy();
+  window.removeEventListener('resize', handleResize);
+  if (resizeFrame) cancelAnimationFrame(resizeFrame);
   destroyExcerptFeature();
   bookmarkImport?.destroy();
   try {
     chrome.runtime.onMessage.removeListener(handleMessage);
+    chrome.storage.onChanged.removeListener(handleStorageChange);
   } catch {
     // The extension context is already gone.
   }
 }
 
 // UI left behind by an older build that predates the replace event.
-const STALE_ELEMENT_IDS = ['twitter-toc-panel', 'xtoc-save-excerpt-button', 'xtoc-library-capture'];
+const STALE_ELEMENT_IDS = [
+  'twitter-toc-panel',
+  'xtoc-save-excerpt-button',
+  'xtoc-library-capture',
+  INLINE_TOC_ID
+];
 
 const isExtensionAlive = () => {
   try {
