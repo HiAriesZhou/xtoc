@@ -87,6 +87,19 @@ npm run build:zip
 - Do not publish private strategy, unpublished roadmaps, competitive analysis, internal sequencing, speculative integrations, or unreleased capability claims.
 - Keep XTOC focused on X/Twitter reading navigation and local clips.
 
+## UI conventions
+
+State the conventions a UI change applies before implementing it, and show screenshots of the changed states (Default and Lights out) for review.
+
+- Stable geometry: no width changes on collapse, no list jumps, no controls that move after input. List rows keep a fixed height: one line per item, overflow ends with an ellipsis and the full text goes in `title`; active or bold states never reflow.
+- Native to X inside X pages: match X's module style (1px border, 16px radius, no shadow), take the theme (Default or Lights out), font and accent color from the page rather than the system, and show no brand chrome.
+- Quiet by default: muted text, only the current item highlighted, no large empty panels. Never cover article content; when there is no room, do not show.
+- One header and state model for expanded and collapsed states, not parallel variants.
+- Small anchored editors for small metadata (tags, notes); inputs do not move as content is added.
+- Optically balanced icons; unfamiliar icons get short labels. Restrained motion that respects `prefers-reduced-motion`.
+- Copy: concise and polite; English for X and store material; describe only shipped behavior.
+- Store and marketing images: show the product's value at thumbnail size, use mock data only, and share one maintained source with the website.
+
 ## Export compatibility
 
 - The current JSON export contract is version `1`, source `twitter-toc-extension`, with `articles[].excerpts` (`src/options/export-utils.js`). Markdown export is Obsidian-style notes in a ZIP (`src/library/obsidian.js`), one note per article or bookmark. Both support all or selected items.
