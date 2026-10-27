@@ -30,8 +30,10 @@
 - Read these rules, check `git status`, and preserve all user changes. Do not overwrite or reformat unrelated work.
 - Identify whether the request concerns XTOC code, public maintenance documentation, or private/product material, then route it accordingly.
 - Audit the relevant README, package scripts, manifest/build configuration, tests, and implementation before describing behavior.
-- Do not commit, push, publish, deploy, create a release, or update a browser-store listing unless the user explicitly requests that action.
+- Do not push, publish, deploy, create a release, or update a browser-store listing unless the user explicitly requests that action. Local commits follow the commit rule below.
 - An authorization level the user grants at the start of a task is that explicit request for every action inside it. Levels: implement only; up to a pull request; up to merge, tag and GitHub Release; up to a browser-store draft. Short replies later ("ok", "go", "提交") never extend the level; an action beyond it needs its own request naming that action. Submitting a store version for review stays with the user unless they delegate it explicitly.
+- Commit each completed logical change as soon as its checks pass, without a separate request: one feature, one fix, one refactor, one docs update, or one version or release-metadata bump per commit, with a `<type>: <description>` message. Never bundle unrelated changes; split a change that mixes them before committing. These commits stay on the task's own feature branch or worktree, never on `main` or in another thread's working tree. Pushing and everything after it follow the authorization level.
+- Merge a pull request with rebase and merge when it holds more than one logical commit, so each lands on `main` on its own; squash only a pull request that is a single logical change.
 
 ## Commands
 
