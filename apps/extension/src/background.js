@@ -6,6 +6,10 @@ import { reinjectionTargets } from './reinject.js';
 import { createVault, idbStore, memoryStore } from './library/key-vault.js';
 import { aiPermissions } from './library/ai-permissions.js';
 import { IMPORT_KEY, importStatus, nextCheckpoints, usableCheckpoint, validScope } from './library/bookmark-import.js';
+import { createAnalyticsService } from './analytics-service.js';
+import { ANALYTICS_KEYS, readAnalytics } from './analytics/store.js';
+import { interpretationInput } from './analytics/insights.js';
+import { generateInterpretation } from './library/ai.js';
 
 const AI_CONFIG_KEY = 'xtocAIConfig'; // session storage: includes the key
 const AI_PREFS_KEY = 'xtocAIPrefs'; // local storage: provider, URL, model, remember flag; never the key
@@ -25,6 +29,9 @@ function enqueue(fn) {
   writes = work.catch(() => {});
   return work;
 }
+
+const analytics = createAnalyticsService({});
+analytics.recover().catch(() => {});
 
 function transaction(fn) {
   return enqueue(async () => {
@@ -200,6 +207,15 @@ async function runAI(action, payload) {
     if (!(await chrome.permissions.contains(aiPermissions(config.endpoint)))) {
       throw new Error('API permission was removed. Save the AI settings again.');
     }
+    if (action === 'analytics:interpret') {
+      const data = readAnalytics((await chrome.storage.local.get(ANALYTICS_KEYS.data))[ANALYTICS_KEYS.data]);
+      const account = data.accounts[payload.accountId];
+      if (!account) throw new Error('No analytics for this account yet.');
+      timer = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
+      const days = [7, 28, 90].includes(payload.days) ? payload.days : 28;
+      const reading = await generateInterpretation(config, interpretationInput(account, { days }), controller.signal);
+      return { ...reading, model: config.model };
+    }
     const input =
       action === 'ai:test'
         ? {
@@ -247,6 +263,10 @@ async function dispatch(message, sender) {
     if (!fromXPage(sender)) throw new Error('Saving must start on X.');
     return transaction((state) => mutate(state, action.slice('library:'.length), payload));
   }
+  if (action === 'analytics:capture' || action === 'analytics:visit') {
+    if (!fromXPage(sender)) throw new Error('Analytics data must come from X.');
+    return action === 'analytics:capture' ? analytics.capture(payload, sender) : analytics.visit();
+  }
   if (['import:status', 'import:checkpoint', 'import:finish'].includes(action)) {
     if (!fromXPage(sender)) throw new Error('Importing must start on X.');
     return enqueue(async () => {
@@ -287,7 +307,12 @@ async function dispatch(message, sender) {
     requests.get(payload.requestId)?.abort();
     return {};
   }
-  if (action === 'ai:suggest' || action === 'ai:test') return runAI(action, payload);
+  if (action === 'analytics:load') return analytics.load();
+  if (action === 'analytics:sync') return analytics.sync();
+  if (action === 'analytics:prefs') return analytics.setPrefs(payload);
+  if (action === 'analytics:clear') return analytics.clear(payload);
+  if (action === 'ai:suggest' || action === 'ai:test' || action === 'analytics:interpret')
+    return runAI(action, payload);
   throw new Error('Unsupported action.');
 }
 
@@ -310,10 +335,10 @@ chrome.runtime.onInstalled.addListener((details) => {
 async function reinjectContentScripts() {
   if (!chrome.scripting) return;
   const tabs = await chrome.tabs.query({ url: ['https://x.com/*', 'https://twitter.com/*'] });
-  for (const { tabId, js, css } of reinjectionTargets(chrome.runtime.getManifest(), tabs)) {
+  for (const { tabId, js, css, world } of reinjectionTargets(chrome.runtime.getManifest(), tabs)) {
     try {
       if (css.length) await chrome.scripting.insertCSS({ target: { tabId }, files: css });
-      await chrome.scripting.executeScript({ target: { tabId }, files: js });
+      await chrome.scripting.executeScript({ target: { tabId }, files: js, world });
     } catch {
       // The tab closed, navigated or is not scriptable; it loads the script on its next visit.
     }

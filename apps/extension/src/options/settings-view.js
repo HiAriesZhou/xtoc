@@ -47,6 +47,26 @@ export function createSettingsView(ctx) {
       );
   }
 
+  async function showAnalyticsPrefs() {
+    try {
+      const { prefs } = await ctx.rpc('analytics:load');
+      main.querySelector('[data-action="auto-sync"]').checked = prefs.autoSync === true;
+    } catch {
+      // Background unavailable; the toggle stays off.
+    }
+  }
+
+  async function setAutoSync(autoSync) {
+    await ctx.rpc('analytics:prefs', { autoSync });
+    ctx.toast(autoSync ? 'Daily sync is on. It runs the next time you open X.' : 'Daily sync is off.');
+  }
+
+  async function clearAnalytics() {
+    if (!confirm('Delete all analytics XTOC stored on this device? Your X account is not affected.')) return;
+    await ctx.rpc('analytics:clear', {});
+    ctx.toast('Analytics data deleted.');
+  }
+
   function render() {
     main.innerHTML = `
       <div class="page-top"><header class="page-head"><div class="page-title"><h1>Settings</h1></div></header></div>
@@ -58,6 +78,13 @@ export function createSettingsView(ctx) {
         </label>
       </section>
       <section class="card" id="aiCard"></section>
+      <section class="card" id="analyticsCard">
+        <div class="card-head"><h2>Analytics</h2></div>
+        <p class="subtle">Sync reads your own X Analytics (X Premium) by opening its pages in a background tab of this browser. Data stays on this device.</p>
+        <label class="check-row"><input class="check" type="checkbox" data-action="auto-sync" />
+          <span>Sync daily when I open X<small>At most once a day, only while X is open and you are signed in. Off by default.</small></span></label>
+        <div class="inline-actions start"><button class="btn btn-ghost-danger" type="button" data-action="clear-analytics">Delete all analytics data</button></div>
+      </section>
       <section class="card" id="sampleData" hidden>
         <div class="card-head"><h2>Sample data</h2><span class="badge">Development build</span></div>
         <p class="subtle">Adds 20 sample clips for testing. Remove deletes only sample items.</p>
@@ -68,10 +95,14 @@ export function createSettingsView(ctx) {
       </section>`;
     createAISettings(ctx, main.querySelector('#aiCard'));
     main.onclick = (event) => {
+      if (event.target.closest('[data-action="clear-analytics"]')) return ctx.guard(clearAnalytics)();
       const action = event.target.closest('#sampleData [data-action]')?.dataset.action;
       if (action) ctx.guard(() => runSeed(action === 'seed-remove' ? 'remove' : 'load'))();
     };
-    main.onchange = null;
+    main.onchange = (event) => {
+      if (event.target.matches('[data-action="auto-sync"]')) ctx.guard(() => setAutoSync(event.target.checked))();
+    };
+    showAnalyticsPrefs();
     main.oninput = null;
     showSampleData();
     ctx.guard(bindContentsToggle)();

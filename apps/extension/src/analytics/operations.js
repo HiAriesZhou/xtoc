@@ -1,0 +1,128 @@
+// X's own analytics pages (x.com/i/account_analytics, Premium only) load their
+// data through these GraphQL operations. XTOC never sends them itself: a
+// MAIN-world content script copies the responses the page already received.
+export const OPERATIONS = {
+  overviewDaily: 'accountOverviewDailyQuery',
+  overviewHourly: 'accountOverviewHourlyQuery',
+  activeFollowers: 'activeFollowersTileQuery',
+  audience: 'audienceOverviewDataQuery',
+  content: 'contentPageQuery',
+  // Notifications timeline; kept only from the Mentions page (who replied to or
+  // mentioned the user). Not an analytics operation, so it has its own page rule.
+  mentions: 'notificationsQuery'
+};
+
+const NAMES = new Set(Object.values(OPERATIONS));
+const HOSTS = ['x.com', 'api.x.com', 'twitter.com', 'api.twitter.com'];
+
+// Matches /graphql/<queryId>/<operation> and /i/api/graphql/<queryId>/<operation>.
+// The query ID changes with every X deploy; the operation name is the stable part.
+export function analyticsOperation(value) {
+  let url;
+  try {
+    url = new URL(String(value), 'https://x.com');
+  } catch {
+    return null;
+  }
+  if (url.protocol !== 'https:' || !HOSTS.includes(url.hostname)) return null;
+  const match = url.pathname.match(/^(?:\/i\/api)?\/graphql\/[\w-]+\/(\w+)\/?$/);
+  return match && NAMES.has(match[1]) ? match[1] : null;
+}
+
+export const ANALYTICS_ORIGIN = 'https://x.com';
+
+// Captures are accepted only from X's own analytics pages, the Mentions page
+// for the notifications operation, or the sync tab.
+export function isAnalyticsPage(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && url.hostname === 'x.com' && /^\/i\/account_analytics(?:\/|$)/.test(url.pathname);
+  } catch {
+    return false;
+  }
+}
+
+export const MENTIONS_URL = 'https://x.com/notifications/mentions';
+
+export function isCapturePage(value, operation) {
+  if (operation !== OPERATIONS.mentions) return isAnalyticsPage(value);
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && url.hostname === 'x.com' && /^\/notifications\/mentions\/?$/.test(url.pathname);
+  } catch {
+    return false;
+  }
+}
+export const PREMIUM_REDIRECTS = ['/i/premium_sign_up', '/i/flow/login', '/i/jf/onboarding', '/login'];
+
+const DAY_MS = 86400000;
+export const MAX_BACKFILL_DAYS = 365;
+const OVERLAP_DAYS = 2; // recent numbers keep changing, so each sync re-reads them
+
+const isoDay = (ms) => new Date(ms).toISOString().slice(0, 10);
+
+// Content page range: everything since the last successful sync (plus overlap),
+// or a year on the first run. The page reads from/to from its URL, so no clicks.
+export function contentRange(lastSuccessAt, now = Date.now()) {
+  const last = Date.parse(lastSuccessAt || '');
+  const days = Number.isFinite(last)
+    ? Math.min(MAX_BACKFILL_DAYS, Math.ceil((now - last) / DAY_MS) + OVERLAP_DAYS)
+    : MAX_BACKFILL_DAYS;
+  return { from: isoDay(now - (days - 1) * DAY_MS), to: isoDay(now) };
+}
+
+export const contentUrl = ({ from, to }) =>
+  `${ANALYTICS_ORIGIN}/i/account_analytics/content/?type=all&from=${from}&to=${to}`;
+
+// One sync visits three pages in a background tab and waits for the operation
+// each page must load. Optional operations are kept when they arrive.
+export function syncSteps(lastSuccessAt, now = Date.now()) {
+  const range = contentRange(lastSuccessAt, now);
+  return [
+    { id: 'content', url: contentUrl(range), expect: OPERATIONS.content, range },
+    {
+      id: 'audience',
+      url: `${ANALYTICS_ORIGIN}/i/account_analytics/audience`,
+      expect: OPERATIONS.audience
+    },
+    {
+      id: 'overview',
+      url: `${ANALYTICS_ORIGIN}/i/account_analytics`,
+      expect: OPERATIONS.overviewDaily
+    },
+    // Optional: a missing Mentions timeline never fails the sync.
+    { id: 'mentions', url: MENTIONS_URL, expect: OPERATIONS.mentions, optional: true }
+  ];
+}
+
+// The content page returns at most 1000 posts per range. When a capture hits
+// that cap, the next step reads the older part of the range.
+export const CONTENT_PAGE_LIMIT = 1000;
+
+export function olderContentStep(range, oldestPostMs) {
+  const to = isoDay(oldestPostMs);
+  if (!range?.from || to <= range.from) return null;
+  return {
+    id: 'content-older',
+    url: contentUrl({ from: range.from, to }),
+    expect: OPERATIONS.content,
+    range: { from: range.from, to }
+  };
+}
+
+export const AUTO_SYNC_INTERVAL_MS = 20 * 60 * 60 * 1000; // about once a day
+
+export function autoSyncDue({ autoSync, lastAttemptAt }, now = Date.now()) {
+  if (!autoSync) return false;
+  const last = Date.parse(lastAttemptAt || '');
+  return !Number.isFinite(last) || now - last >= AUTO_SYNC_INTERVAL_MS;
+}
+
+export function isPremiumRedirect(value) {
+  try {
+    const url = new URL(value);
+    return PREMIUM_REDIRECTS.some((path) => url.pathname.startsWith(path));
+  } catch {
+    return false;
+  }
+}
