@@ -31,6 +31,7 @@
 - Identify whether the request concerns XTOC code, public maintenance documentation, or private/product material, then route it accordingly.
 - Audit the relevant README, package scripts, manifest/build configuration, tests, and implementation before describing behavior.
 - Do not commit, push, publish, deploy, create a release, or update a browser-store listing unless the user explicitly requests that action.
+- An authorization level the user grants at the start of a task is that explicit request for every action inside it. Levels: implement only; up to a pull request; up to merge, tag and GitHub Release; up to a browser-store draft. Short replies later ("ok", "go", "提交") never extend the level; an action beyond it needs its own request naming that action. Submitting a store version for review stays with the user unless they delegate it explicitly.
 
 ## Commands
 
