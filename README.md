@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/HiAriesZhou/xtoc/releases"><img src="https://img.shields.io/badge/version-0.8.0-blue" alt="Version 0.8.0"></a>
+  <a href="https://github.com/HiAriesZhou/xtoc/releases"><img src="https://img.shields.io/badge/version-0.9.0-blue" alt="Version 0.9.0"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License"></a>
   <a href="https://chromewebstore.google.com/detail/nbdgpckkcfkomnmdefinikjijgljgjfp?utm_source=item-share-cb"><img src="https://img.shields.io/chrome-web-store/size/nbdgpckkcfkomnmdefinikjijgljgjfp" alt="Chrome Web Store"></a>
 </p>
@@ -37,23 +37,23 @@ Watch the 40-second demo: navigate an article, save passages, edit tags and note
 
 ## How it works
 
-1. **Navigate the article.** Open the popup to see detected headings, jump to a section, or pin a movable table of contents beside the article.
+1. **Navigate the article.** Open a long-form article and its contents appear in X's right column, above the recommendations, and stay in view while you read. In Focus mode they sit beside the article. Jump to any section from there or from the popup.
 2. **Save a passage.** Select text and click `save to xtoc`. XTOC stores the passage locally with its article, author when available, timestamps, and surrounding context.
 3. **Organize and export.** Open Library to search clips, add tags or notes, delete items, and export all or selected clips as Markdown or JSON.
 
 ## Features
 
-- **Article navigation** — heading detection for X.com and Twitter.com long-form articles, in the popup or a draggable floating table of contents that remembers its position.
+- **Article navigation** — heading detection for X.com and Twitter.com long-form articles. Articles with two or more sections show a quiet contents module that follows X's Default or Lights out theme and accent color, highlights the current section, and collapses to one line. Its menu pops it out as a draggable floating panel that remembers its position, or hides it on articles (turn it back on in the popup or **Settings**). Narrow windows without X's right column show no module; use the popup or the floating panel there.
 - **Clips** — select text and save it locally with one click, together with its article, author when available, timestamps and surrounding context.
 - **Bookmarks** — save the current article or post with **Save to Bookmarks** in the popup, or import from your X Bookmarks page. Imports only read loaded previews and never change your X bookmarks.
   Repeat imports can stop at the previous import for the same account and list. **Scan all bookmarks** in the import menu checks older bookmarks too. The first run, an unrecognized list, or an invalid import record requires a full scan; page loading failures can still require a retry. On the Bookmarks page, the XTOC popup offers the same import controls and progress, so you can start again after closing the import bar. Keep the tab visible while importing; it waits while the tab is in the background.
 - **No reload after updates** — X tabs that were already open keep working when XTOC is installed or updated.
 
-Open **Library** from the popup or the pinned contents panel. It has three pages:
+Open **Library** from the popup or the contents menu. It has three pages:
 
 - **Clips** — search, tag, annotate, delete and export your saved passages.
 - **Bookmarks** — search, tag, annotate, delete and export saved articles and posts.
-- **Settings** — optional AI and local storage usage.
+- **Settings** — article contents display, optional AI and local storage usage.
 
 Clips and bookmarks export as Obsidian-style Markdown: a ZIP with one note per article or post, YAML properties, tags, and clips as quote callouts. Clips can also be exported as JSON v1. You can export everything or only selected items.
 

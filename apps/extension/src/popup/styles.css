@@ -161,6 +161,18 @@ button {
   font-size: 13px;
 }
 
+.inline-toc-off {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.inline-toc-off .text-btn {
+  flex: none;
+  height: 28px;
+}
+
 .toc-list {
   list-style: none;
   max-height: 340px;

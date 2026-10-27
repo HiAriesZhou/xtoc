@@ -1,74 +1,30 @@
 // Floating, draggable table-of-contents panel pinned beside the article.
-import { getActiveSectionIndex, hasReachedScrollTarget } from './navigation-utils.js';
 import {
   findArticleContainer,
   isExtensionContextAvailable,
   isExtensionContextError
 } from './page-utils.js';
-
-const TOC_READING_LINE = 96;
-const TOC_NAVIGATION_TIMEOUT = 2500;
-const TOC_NAVIGATION_KEYS = new Set([
-  'ArrowUp',
-  'ArrowDown',
-  'PageUp',
-  'PageDown',
-  'Home',
-  'End',
-  ' '
-]);
-
-function escapeTocHtml(value) {
-  return String(value || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
+import { TocTracker, markActiveItem, renderTocList } from './toc-view.js';
 
 // TOC Panel Class - manages floating pinnable panel
 export class TOCPanel {
-  // getHeaders: () => the current heading elements; onSelect: (index) => scroll to one.
-  constructor({ getHeaders, onSelect }) {
-    this.getHeaders = getHeaders;
+  // getHeaders: () => the current heading elements; onSelect: (index) => scroll
+  // to one; onVisibilityChange: (isVisible) => void after show or hide.
+  constructor({ getHeaders, onSelect, onVisibilityChange = () => {} }) {
     this.onSelect = onSelect;
+    this.onVisibilityChange = onVisibilityChange;
     this.panel = null;
     this.isVisible = false;
     this.isDragging = false;
     this.dragOffset = { x: 0, y: 0 };
     this.defaultPosition = { x: 20, y: 100 };
     this.hasSavedPosition = false;
-    this.activeIndex = -1;
     this.isCollapsed = false;
-    this.scrollFrame = null;
-    this.navigationTargetIndex = null;
-    this.navigationTargetScroll = null;
-    this.navigationTimeout = null;
     this.collapseLayoutTimeout = null;
     this.layoutResizeObserver = null;
     this.layoutResizeFrame = null;
     this.layoutSignature = null;
-    this.handleScroll = () => {
-      if (this.scrollFrame) return;
-      this.scrollFrame = requestAnimationFrame(() => {
-        this.scrollFrame = null;
-        if (this.navigationTargetIndex !== null) {
-          if (hasReachedScrollTarget(window.scrollY, this.navigationTargetScroll)) {
-            this.finishNavigation();
-          } else {
-            this.setActiveIndex(this.navigationTargetIndex);
-          }
-          return;
-        }
-        this.updateActiveSection();
-      });
-    };
-    this.handleUserScrollIntent = (event) => {
-      if (this.navigationTargetIndex === null) return;
-      if (event.type === 'keydown' && !TOC_NAVIGATION_KEYS.has(event.key)) return;
-      this.cancelNavigation();
-    };
+    this.tracker = new TocTracker({ getHeaders, onChange: (index) => this.highlight(index) });
     this.handleResize = () => {
       this.syncCurtainHeight();
       this.keepInViewport();
@@ -219,9 +175,6 @@ export class TOCPanel {
       if (event.key === 'Escape') this.hide();
     });
     window.addEventListener('resize', this.handleResize);
-    window.addEventListener('wheel', this.handleUserScrollIntent, { passive: true });
-    window.addEventListener('touchstart', this.handleUserScrollIntent, { passive: true });
-    window.addEventListener('keydown', this.handleUserScrollIntent);
   }
 
   toggleCollapsed(button) {
@@ -360,9 +313,7 @@ export class TOCPanel {
 
     // Update TOC content
     const body = this.panel.querySelector('.toc-panel-body');
-    this.clearNavigation();
-    this.activeIndex = -1;
-    body.innerHTML = this.renderTOC(toc);
+    body.innerHTML = renderTocList(toc);
     if (!this.hasSavedPosition) {
       const placement = this.getArticleSidePlacement();
       this.position = { x: placement.x, y: placement.y };
@@ -382,8 +333,8 @@ export class TOCPanel {
         this.onSelect(index);
       });
     });
-    window.addEventListener('scroll', this.handleScroll, { passive: true });
-    this.updateActiveSection();
+    this.tracker.start();
+    this.onVisibilityChange(true);
   }
 
   getArticleSidePlacement() {
@@ -408,84 +359,20 @@ export class TOCPanel {
     return { x, y, width, collapsed: !hasExpandedSpace };
   }
 
-  updateActiveSection() {
-    const headerElements = this.getHeaders();
-    if (!this.isVisible || headerElements.length === 0) return;
-    const headerTops = headerElements.map(
-      (header) => header.element?.getBoundingClientRect().top ?? Number.POSITIVE_INFINITY
-    );
-    const isAtPageEnd =
-      window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 4;
-    const nextIndex = getActiveSectionIndex(headerTops, TOC_READING_LINE, isAtPageEnd);
-    this.setActiveIndex(nextIndex);
-  }
-
   startNavigation(index, targetScroll) {
-    this.clearNavigation();
-    this.navigationTargetIndex = index;
-    this.navigationTargetScroll = targetScroll;
-    this.setActiveIndex(index);
-    this.navigationTimeout = setTimeout(() => this.finishNavigation(), TOC_NAVIGATION_TIMEOUT);
+    this.tracker.startNavigation(index, targetScroll);
   }
 
-  finishNavigation() {
-    if (this.navigationTargetIndex === null) return;
-    this.clearNavigation();
-    this.updateActiveSection();
+  // Moves keyboard focus into the panel, on the current section when known.
+  focusCurrent() {
+    const item =
+      this.panel?.querySelector('.toc-item.active') || this.panel?.querySelector('.toc-item');
+    item?.focus();
   }
 
-  clearNavigation() {
-    clearTimeout(this.navigationTimeout);
-    this.navigationTimeout = null;
-    this.navigationTargetIndex = null;
-    this.navigationTargetScroll = null;
-  }
-
-  cancelNavigation() {
-    this.finishNavigation();
-  }
-
-  setActiveIndex(index) {
-    if (this.activeIndex === index) return;
-    this.activeIndex = index;
-    const items = this.panel?.querySelectorAll('.toc-item') || [];
-    items.forEach((item, itemIndex) => {
-      const isActive = itemIndex === index;
-      item.classList.toggle('active', isActive);
-      if (isActive) {
-        item.setAttribute('aria-current', 'location');
-        const body = this.panel?.querySelector('.toc-panel-body');
-        const itemRect = item.getBoundingClientRect();
-        const bodyRect = body?.getBoundingClientRect();
-        if (body && bodyRect && itemRect.top < bodyRect.top) {
-          body.scrollTop -= bodyRect.top - itemRect.top;
-        } else if (body && bodyRect && itemRect.bottom > bodyRect.bottom) {
-          body.scrollTop += itemRect.bottom - bodyRect.bottom;
-        }
-      } else {
-        item.removeAttribute('aria-current');
-      }
-    });
-  }
-
-  renderTOC(toc) {
-    if (!toc || toc.length === 0) {
-      return '<div class="toc-empty">No sections found</div>';
-    }
-
-    return `
-      <ul class="toc-list">
-        ${toc
-          .map(
-            (item, index) => `
-          <li class="toc-row level-${item.level}">
-            <button class="toc-item" type="button" data-index="${index}">${escapeTocHtml(item.text)}</button>
-          </li>
-        `
-          )
-          .join('')}
-      </ul>
-    `;
+  highlight(index) {
+    if (!this.panel) return;
+    markActiveItem(this.panel, this.panel.querySelector('.toc-panel-body'), index);
   }
 
   hide() {
@@ -493,9 +380,9 @@ export class TOCPanel {
       this.panel.style.display = 'none';
     }
     this.isVisible = false;
-    window.removeEventListener('scroll', this.handleScroll);
-    this.clearNavigation();
+    this.tracker.stop();
     this.persistLocalState({ tocPanelVisible: false });
+    this.onVisibilityChange(false);
   }
 
   keepInViewport() {
@@ -524,18 +411,13 @@ export class TOCPanel {
       this.panel.remove();
       this.panel = null;
     }
-    window.removeEventListener('scroll', this.handleScroll);
     window.removeEventListener('resize', this.handleResize);
-    window.removeEventListener('wheel', this.handleUserScrollIntent);
-    window.removeEventListener('touchstart', this.handleUserScrollIntent);
-    window.removeEventListener('keydown', this.handleUserScrollIntent);
-    if (this.scrollFrame) cancelAnimationFrame(this.scrollFrame);
+    this.tracker.stop();
     if (this.layoutResizeFrame) cancelAnimationFrame(this.layoutResizeFrame);
     this.layoutResizeObserver?.disconnect();
     this.layoutResizeFrame = null;
     this.layoutResizeObserver = null;
     this.layoutSignature = null;
     clearTimeout(this.collapseLayoutTimeout);
-    this.clearNavigation();
   }
 }

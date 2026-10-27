@@ -5,14 +5,14 @@ browser:
   endpoint: http://127.0.0.1:9333
 targets:
   chrome:
-    artifact: release/xtoc-chrome-v0.8.0.zip
+    artifact: release/xtoc-chrome-v0.9.0.zip
     itemId: nbdgpckkcfkomnmdefinikjijgljgjfp
     language: English – en (default)
   edge:
-    artifact: release/xtoc-edge-v0.8.0.zip
+    artifact: release/xtoc-edge-v0.9.0.zip
     productId: 4cc2402b-2567-46af-9e46-384c556ffb0e
     language: English – en (default)
   firefox:
-    artifact: release/xtoc-firefox-v0.8.0.zip
-    source: release/xtoc-source-v0.8.0.zip
+    artifact: release/xtoc-firefox-v0.9.0.zip
+    source: release/xtoc-source-v0.9.0.zip
     addon: xtoc@arieszhou.com

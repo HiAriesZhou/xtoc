@@ -83,4 +83,5 @@ After `CLEANUP`, confirm the printed evidence directory still contains the PNGs,
 
 - Executable `scripts/verify.cjs doctor`: read-only build check.
 - Executable `scripts/verify.cjs run`: complete headless clip proof, evidence capture, and teardown. Node.js 20+ and external Playwright/full Chromium are required; app lockfiles are not modified for harness dependencies.
+- `assets/article-layout.html`: synthetic X article layout (right column with X's sticky behavior, Focus mode route, Lights out) for the inline contents checks in [navigation](features/navigation.md).
 - `assets/article.html`: minimal synthetic X long-form DOM with article markers, author, timestamp, two headings and passage/context. Maintain its DOM against `content/page-utils.js` and `content/toc-extract.js`; never weaken the production selectors to fit it.

@@ -1,8 +1,12 @@
-Long X/Twitter articles are easier to follow when their structure stays visible, and worth keeping when you find them. XTOC turns article headings into a table of contents you can open from the toolbar or pin beside the article, and keeps the posts, articles and passages you save in a local library.
+Long X/Twitter articles are easier to follow when their structure stays visible, and worth keeping when you find them. Open a long-form article and its table of contents is already there: a quiet module in X's right column that looks like part of X. XTOC also keeps the posts, articles and passages you save in a local library.
 
 Read
-• Jump between article sections and follow your current section while scrolling
-• Pin, move, resize and collapse the table of contents
+• Contents appear on their own: open a long-form article and its sections show at the top of X's right column, with nothing to click or pin
+• Looks like part of X: the module uses X's own module style, follows your Default or Lights out theme, and takes X's font and the accent color you chose
+• Stays out of the way: muted text, one line per heading, and only the current section highlighted. It never covers the article and stays in view while you read
+• Jump to any section and follow your current section as you scroll
+• Collapse it to one line, hide it on articles from its menu (turn it back on from the toolbar popup or Settings), or pop it out as a floating panel you can move and resize
+• In X's Focus mode, the contents sit in the space beside the article
 
 Save
 • Select a passage and click "save to xtoc" to keep it with its source and surrounding context
@@ -22,6 +26,6 @@ Optional AI (off by default)
 Privacy
 Clips, bookmarks, tags, notes and settings are stored locally in your browser. XTOC has no account, no telemetry and no cloud storage. Exports are created only when you request them.
 
-Works on x.com and twitter.com. The table of contents depends on headings being present in the article. Bookmark import saves the text X shows in the list, which may be a preview of a long post.
+Works on x.com and twitter.com. The table of contents depends on headings being present in the article. It appears on its own for articles with at least two sections when X shows its right column, or in Focus mode when there is room beside the article; otherwise open it from the toolbar. Bookmark import saves the text X shows in the list, which may be a preview of a long post.
 
 XTOC is an independent extension and is not affiliated with X Corp.
