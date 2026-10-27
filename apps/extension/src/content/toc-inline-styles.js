@@ -147,7 +147,6 @@ export const INLINE_TOC_STYLES = `
     font-size: 15px;
     line-height: 20px;
     text-align: left;
-    overflow-wrap: anywhere;
     transition: color 0.12s ease, background-color 0.12s ease;
   }
 
@@ -160,6 +159,14 @@ export const INLINE_TOC_STYLES = `
     box-shadow: inset 2px 0 0 var(--xtoc-accent);
     color: var(--xtoc-text);
     font-weight: 600;
+  }
+
+  /* One line per row: long titles end in an ellipsis instead of wrapping. */
+  .toc-label {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .level-1 .toc-item { padding-left: 16px; }

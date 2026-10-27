@@ -34,7 +34,7 @@
 <script>
   if (new URLSearchParams(location.search).get('theme') === 'dark') document.documentElement.classList.add('dark');
   const focus = /\/article\/\d+/.test(location.pathname);
-  const sections = ['Why structure matters', 'Reading with a map', 'Where sections begin', 'Keeping your place', 'Returning to a passage', 'What stays local'];
+  const sections = ['Why structure matters', 'Reading with a map', 'Where sections begin', 'Keeping your place while reading the whole', 'Returning to a passage', 'What stays local'];
   const filler = 'This synthetic paragraph exists only to give the fixture article enough height to scroll through several sections while the right column keeps its own position. ';
   const article = `<article><div data-testid="twitterArticleReadView">
     <h1 data-testid="twitter-article-title">A synthetic long-form article</h1>

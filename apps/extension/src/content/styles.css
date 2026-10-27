@@ -266,6 +266,14 @@
   background: var(--accent-color);
 }
 
+/* One line per row: long titles end in an ellipsis instead of wrapping. */
+.twitter-toc-panel .toc-label {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Indentation based on heading level */
 .twitter-toc-panel .toc-row.level-1 .toc-item {
   padding-left: 10px;

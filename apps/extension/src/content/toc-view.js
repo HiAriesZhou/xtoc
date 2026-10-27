@@ -23,6 +23,8 @@ export function escapeTocHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
+// Every row is one line (the label truncates with an ellipsis), so the bold
+// current section never changes a row's height. The title shows the full text.
 export function renderTocList(toc) {
   if (!toc || toc.length === 0) {
     return '<div class="toc-empty">No sections found</div>';
@@ -34,7 +36,7 @@ export function renderTocList(toc) {
         .map(
           (item, index) => `
         <li class="toc-row level-${item.level}">
-          <button class="toc-item" type="button" data-index="${index}">${escapeTocHtml(item.text)}</button>
+          <button class="toc-item" type="button" data-index="${index}" title="${escapeTocHtml(item.text)}"><span class="toc-label">${escapeTocHtml(item.text)}</span></button>
         </li>
       `
         )
