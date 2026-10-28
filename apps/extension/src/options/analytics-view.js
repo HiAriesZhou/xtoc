@@ -89,7 +89,7 @@ export function createAnalyticsView(ctx) {
       'See your X Analytics, explained',
       'Requires X Premium. Sync opens X Analytics in a background tab of this browser, where you are signed in, and keeps a copy on this device. Sync uploads nothing.'
     )}
-      <p class="hint a-empty-note">First sync reads up to a year of posts. To keep daily history beyond what X shows, open X Analytics once and choose 1Y, or turn on daily sync in Settings.</p>`;
+      <p class="hint a-empty-note">First sync reads the last 12 weeks of posts. Daily totals start with the 7 days X sends; each later sync adds days. Turn on daily sync in Settings to keep them continuous.</p>`;
   }
 
   function render() {

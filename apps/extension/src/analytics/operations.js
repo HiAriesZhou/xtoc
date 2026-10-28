@@ -74,30 +74,45 @@ export function isCapturePage(value, operation) {
 export const PREMIUM_REDIRECTS = ['/i/premium_sign_up', '/i/flow/login', '/i/jf/onboarding', '/login'];
 
 const DAY_MS = 86400000;
-export const MAX_BACKFILL_DAYS = 365;
+// A live check showed X's content query returns only a sample of posts for
+// long ranges (a year gave 245 of 749 posts) but complete results for 28 days.
+// X's own content page offers at most three months.
+export const CONTENT_WINDOW_DAYS = 28;
+export const MAX_BACKFILL_DAYS = 3 * CONTENT_WINDOW_DAYS;
 const OVERLAP_DAYS = 2; // recent numbers keep changing, so each sync re-reads them
 
 const isoDay = (ms) => new Date(ms).toISOString().slice(0, 10);
 
-// Content page range: everything since the last successful sync (plus overlap),
-// or a year on the first run. The page reads from/to from its URL, so no clicks.
-export function contentRange(lastSuccessAt, now = Date.now()) {
+// Content windows, newest first: everything since the last successful sync
+// (plus overlap), or 12 weeks on the first run. The page reads from/to from
+// its URL, so no clicks are needed.
+export function contentRanges(lastSuccessAt, now = Date.now()) {
   const last = Date.parse(lastSuccessAt || '');
   const days = Number.isFinite(last)
     ? Math.min(MAX_BACKFILL_DAYS, Math.ceil((now - last) / DAY_MS) + OVERLAP_DAYS)
     : MAX_BACKFILL_DAYS;
-  return { from: isoDay(now - (days - 1) * DAY_MS), to: isoDay(now) };
+  const ranges = [];
+  for (let end = 0; end < days; end += CONTENT_WINDOW_DAYS) {
+    const span = Math.min(CONTENT_WINDOW_DAYS, days - end);
+    ranges.push({ from: isoDay(now - (end + span - 1) * DAY_MS), to: isoDay(now - end * DAY_MS) });
+  }
+  return ranges;
 }
 
 export const contentUrl = ({ from, to }) =>
   `${ANALYTICS_ORIGIN}/i/account_analytics/content/?type=all&from=${from}&to=${to}`;
 
-// One sync visits three pages in a background tab and waits for the operation
+// One sync visits the content page (once per window), audience, overview and Mentions in a background tab and waits for the operation
 // each page must load. Optional operations are kept when they arrive.
 export function syncSteps(lastSuccessAt, now = Date.now()) {
-  const range = contentRange(lastSuccessAt, now);
+  const content = contentRanges(lastSuccessAt, now).map((range, i) => ({
+    id: i ? `content-${i + 1}` : 'content',
+    url: contentUrl(range),
+    expect: OPERATIONS.content,
+    range
+  }));
   return [
-    { id: 'content', url: contentUrl(range), expect: OPERATIONS.content, range },
+    ...content,
     {
       id: 'audience',
       url: `${ANALYTICS_ORIGIN}/i/account_analytics/audience`,

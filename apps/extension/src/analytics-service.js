@@ -18,7 +18,7 @@ import { ANALYTICS_KEYS, applyCapture, emptyAnalytics, readAnalytics } from './a
 // lost that way is cleaned up by recover() on the next event.
 const STEP_TIMEOUT_MS = 25000;
 const SETTLE_MS = 2500; // let optional queries on the same page arrive
-const MAX_STEPS = 8;
+const MAX_STEPS = 12;
 const KNOWN = new Set(Object.values(OPERATIONS));
 
 const DIAGNOSTICS_KEY = 'xtocAnalyticsDiagnostics'; // session storage: shapes only
@@ -100,7 +100,14 @@ export function createAnalyticsService({
       ['days', 'hours', 'heatmap', 'posts', 'mentions']
         .filter((key) => parsed[key] !== undefined)
         .map((key) => [key, Array.isArray(parsed[key]) ? parsed[key].length : Object.keys(parsed[key]).length])
+        .concat(parsed.rowCount === undefined ? [] : [['rows', parsed.rowCount]])
+        .concat(parsed.dropped ? [['dropped', parsed.dropped]] : [])
+        .concat(parsed.posts?.length ? [['postDays', postDays(parsed.posts)]] : [])
     );
+  const postDays = (posts) => {
+    const days = posts.map((post) => new Date(post.createdAt).toISOString().slice(0, 10)).sort();
+    return [days[0], days.at(-1)];
+  };
 
   async function finish(error) {
     if (!run) return;

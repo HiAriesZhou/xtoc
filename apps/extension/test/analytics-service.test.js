@@ -73,10 +73,11 @@ test('a later response without an account ID uses the account seen in the same t
 });
 
 test('sync visits content, audience and overview in an inactive tab, then closes it', async () => {
-  const { service, log } = harness();
+  const { service, log, data } = harness();
+  data.xtocAnalyticsSync = { lastSuccessAt: '2026-10-25T12:00:00.000Z' }; // one content window
   assert.deepEqual(await service.sync(), { running: true });
   assert.deepEqual(log[0].slice(0, 1).concat(log[0][2]), ['create', false]);
-  assert.match(log[0][1], /\/i\/account_analytics\/content\/\?type=all&from=2025-10-27&to=2026-10-26$/);
+  assert.match(log[0][1], /\/i\/account_analytics\/content\/\?type=all&from=2026-10-24&to=2026-10-26$/);
   const tab = fromTab(10);
   await service.capture({ operation: 'accountOverviewDailyQuery', body: overviewDaily() }, tab); // not this step's query
   await service.capture({ operation: 'contentPageQuery', body: content([tweet({ id: '1', createdAt: day0 })]) }, tab);
@@ -91,16 +92,17 @@ test('sync visits content, audience and overview in an inactive tab, then closes
   await service.capture({ operation: 'notificationsQuery', body: mentions() }, fromTab(10, 'https://x.com/notifications/mentions'));
   await wait(20);
   assert.deepEqual(log.at(-1), ['remove', 10]);
-  const { sync, data } = await service.load();
-  assert.equal(sync.ok, true);
-  assert.equal(sync.running, false);
-  assert.equal(sync.lastSuccessAt, '2026-10-26T12:00:00.000Z');
-  assert.deepEqual(sync.steps.map((s) => s.ok), [true, true, true, true]);
-  assert.ok(data.accounts[ACCOUNT_ID].inbound['501']);
+  const loaded = await service.load();
+  assert.equal(loaded.sync.ok, true);
+  assert.equal(loaded.sync.running, false);
+  assert.equal(loaded.sync.lastSuccessAt, '2026-10-26T12:00:00.000Z');
+  assert.deepEqual(loaded.sync.steps.map((s) => s.ok), [true, true, true, true]);
+  assert.ok(loaded.data.accounts[ACCOUNT_ID].inbound['501']);
 });
 
 test('a missing Mentions timeline does not fail the sync', async () => {
-  const { service } = harness({ stepTimeoutMs: 30 });
+  const { service, data } = harness({ stepTimeoutMs: 30 });
+  data.xtocAnalyticsSync = { lastSuccessAt: '2026-10-25T12:00:00.000Z' };
   await service.sync();
   const tab = fromTab(10);
   await service.capture({ operation: 'contentPageQuery', body: content([tweet({ id: '1', createdAt: day0 })]) }, tab);
@@ -180,7 +182,7 @@ test('diagnostics record shapes and outcomes per operation, without values', asy
   await service.capture({ operation: 'accountOverviewDailyQuery', body: overviewDaily() }, fromTab(1, 'https://x.com/home'));
   await assert.rejects(service.capture({ operation: 'audienceOverviewDataQuery', body: { data: null } }, fromTab(1)));
   const report = await service.diagnostics();
-  assert.deepEqual(report.captures.contentPageQuery.records, { posts: 1 });
+  assert.deepEqual(report.captures.contentPageQuery.records, { posts: 1, rows: 1, dropped: {}, postDays: ['2026-10-20', '2026-10-20'] });
   assert.equal(report.captures.contentPageQuery.path, '/i/account_analytics');
   assert.equal(report.captures.accountOverviewDailyQuery.accepted, false);
   assert.match(report.captures.audienceOverviewDataQuery.error, /no analytics data/);
@@ -204,4 +206,21 @@ test('NotificationsTimeline without an account ID is stored for the only account
   await service.capture({ operation: 'NotificationsTimeline', body }, fromTab(5, 'https://x.com/notifications/mentions'));
   const { data } = await service.load();
   assert.equal(data.accounts[ACCOUNT_ID].inbound['801'].handle, 'zed');
+});
+
+test('the first sync reads 12 weeks of content in three windows', async () => {
+  const { service, log } = harness();
+  await service.sync();
+  const tab = fromTab(10);
+  for (let i = 0; i < 3; i++) {
+    await service.capture({ operation: 'contentPageQuery', body: content([tweet({ id: String(i + 1), createdAt: day0 })]) }, tab);
+    await wait(20);
+  }
+  const urls = log.filter((entry) => entry[0] !== 'remove').map((entry) => entry.at(-1) === false ? entry[1] : entry[2]);
+  assert.deepEqual(urls.slice(0, 4).map((url) => url.replace(/^https:\/\/x\.com/, '')), [
+    '/i/account_analytics/content/?type=all&from=2026-09-29&to=2026-10-26',
+    '/i/account_analytics/content/?type=all&from=2026-09-01&to=2026-09-28',
+    '/i/account_analytics/content/?type=all&from=2026-08-04&to=2026-08-31',
+    '/i/account_analytics/audience'
+  ]);
 });

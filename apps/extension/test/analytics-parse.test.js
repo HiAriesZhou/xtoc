@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   analyticsOperation,
   autoSyncDue,
-  contentRange,
+  contentRanges,
   graphqlOperationName,
   isDiagnosticPath,
   isAnalyticsPage,
@@ -25,19 +25,25 @@ test('analyticsOperation recognizes only X analytics GraphQL operations', () => 
   assert.equal(analyticsOperation('not a url %%'), null);
 });
 
-test('contentRange backfills a year first, then only what is new with overlap', () => {
+test('contentRanges backfill 12 weeks in windows of at most 28 days, then only what is new', () => {
   const now = Date.parse('2026-10-26T12:00:00Z');
-  assert.deepEqual(contentRange(null, now), { from: '2025-10-27', to: '2026-10-26' });
-  assert.deepEqual(contentRange('2026-10-24T08:00:00Z', now), { from: '2026-10-22', to: '2026-10-26' });
-  assert.deepEqual(contentRange('2020-01-01T00:00:00Z', now).from, '2025-10-27');
+  assert.deepEqual(contentRanges(null, now), [
+    { from: '2026-09-29', to: '2026-10-26' },
+    { from: '2026-09-01', to: '2026-09-28' },
+    { from: '2026-08-04', to: '2026-08-31' }
+  ]);
+  assert.deepEqual(contentRanges('2026-10-24T08:00:00Z', now), [{ from: '2026-10-22', to: '2026-10-26' }]);
+  assert.equal(contentRanges('2020-01-01T00:00:00Z', now).length, 3);
 });
 
 test('syncSteps visit content, audience and overview with their expected operations', () => {
   const steps = syncSteps(null, Date.parse('2026-10-26T12:00:00Z'));
-  assert.deepEqual(steps.map((s) => s.expect), ['contentPageQuery', 'audienceOverviewDataQuery', 'accountOverviewDailyQuery', 'NotificationsTimeline']);
-  assert.deepEqual(steps.map((s) => Boolean(s.optional)), [false, false, false, true]);
-  assert.match(steps[0].url, /^https:\/\/x\.com\/i\/account_analytics\/content\/\?type=all&from=2025-10-27&to=2026-10-26$/);
-  assert.deepEqual(steps[0].range, { from: '2025-10-27', to: '2026-10-26' });
+  assert.deepEqual(steps.map((s) => s.expect), ['contentPageQuery', 'contentPageQuery', 'contentPageQuery', 'audienceOverviewDataQuery', 'accountOverviewDailyQuery', 'NotificationsTimeline']);
+  assert.deepEqual(steps.map((s) => s.id), ['content', 'content-2', 'content-3', 'audience', 'overview', 'mentions']);
+  assert.deepEqual(steps.map((s) => Boolean(s.optional)), [false, false, false, false, false, true]);
+  assert.equal(syncSteps('2026-10-25T12:00:00Z', Date.parse('2026-10-26T12:00:00Z')).length, 4);
+  assert.match(steps[0].url, /^https:\/\/x\.com\/i\/account_analytics\/content\/\?type=all&from=2026-09-29&to=2026-10-26$/);
+  assert.deepEqual(steps[0].range, { from: '2026-09-29', to: '2026-10-26' });
 });
 
 test('olderContentStep continues below the oldest captured post, and stops at the range start', () => {
@@ -216,4 +222,13 @@ test('legacy NotificationsTimeline: tweets anywhere under data, quoted tweets sk
   assert.equal(parsed.accountId, '');
   assert.deepEqual(parsed.mentions.map((m) => [m.id, m.handle, m.kind]).sort(), [['701', 'dana', 'reply'], ['703', 'erin', 'mention']]);
   assert.throws(() => parseCapture('NotificationsTimeline', { errors: [] }), /no mentions data/);
+});
+
+test('content rows wrapped in TweetWithVisibilityResults are read', () => {
+  const wrapped = tweet({ id: '7', createdAt: day0, impressions: 6500 });
+  const row = { rest_id: '7', result: { __typename: 'TweetWithVisibilityResults', tweet: { ...wrapped.result, __typename: undefined } } };
+  const parsed = parseCapture('contentPageQuery', content([row]));
+  assert.equal(parsed.posts.length, 1);
+  assert.equal(parsed.posts[0].metrics.Impressions, 6500);
+  assert.deepEqual(parsed.dropped, {});
 });

@@ -231,8 +231,11 @@ function replyTarget(tweet) {
   };
 }
 
+// Some rows arrive wrapped as TweetWithVisibilityResults { tweet }.
+const unwrapTweet = (result) => (result?.__typename === 'TweetWithVisibilityResults' && result.tweet ? result.tweet : result);
+
 function parsePost(item) {
-  const tweet = item?.result;
+  const tweet = unwrapTweet(item?.result);
   const id = str(tweet?.rest_id || item?.rest_id, 25);
   if (!/^\d+$/.test(id)) return null;
   const createdAt = toMs(tweet?.details?.created_at_ms);
@@ -256,10 +259,26 @@ function parsePost(item) {
   };
 }
 
+// Why rows were not read, by type name and missing field (diagnostics; no values).
+function droppedRows(rows) {
+  const reasons = {};
+  for (const item of rows) {
+    const tweet = unwrapTweet(item?.result);
+    let reason = '';
+    if (!tweet) reason = 'no result';
+    else if (tweet.__typename && tweet.__typename !== 'Tweet') reason = `type ${str(String(tweet.__typename), 40)}`;
+    else if (!/^\d+$/.test(str(tweet.rest_id || item?.rest_id, 25))) reason = 'no id';
+    else if (toMs(tweet.details?.created_at_ms) === null) reason = 'no time';
+    if (reason) reasons[reason] = (reasons[reason] || 0) + 1;
+  }
+  return reasons;
+}
+
 function parseContent(user) {
   const rows = list(user.tweets_results, MAX_POSTS);
   return {
     posts: rows.map(parsePost).filter(Boolean),
+    dropped: droppedRows(rows),
     rowCount: rows.length, // before unreadable rows are dropped; compared with X's page limit
     profile: {
       handle: str(user.core?.screen_name, 15),
