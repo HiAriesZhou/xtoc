@@ -48,7 +48,7 @@ test('CSV posts keep an existing precise timestamp and stay out of the hour grid
   const precise = Date.parse('2026-10-24T09:30:00Z');
   let state = applyCapture(emptyAnalytics(), { operation: 'contentPageQuery', accountId: '1', posts: [{ id: '111', createdAt: precise, text: 'x', kind: 'post', replyTo: null, hashtags: [], links: 0, media: [], metrics: { Impressions: 100 } }], profile: { handle: 'example' } }, { now: 1 });
   const csv = parseAnalyticsCsv(CONTENT);
-  state = applyCapture(state, { operation: 'contentPageQuery', accountId: '1', posts: csv.posts, profile: csv.profile }, { now: 2 });
+  state = applyCapture(state, { operation: 'contentPageQuery', accountId: '1', posts: csv.posts, profile: csv.profile }, { now: 2, source: 'csv' });
   assert.equal(state.accounts['1'].posts['111'].createdAt, precise);
   assert.equal(state.accounts['1'].posts['111'].metrics.Impressions, 500);
   const grid = postingGrid([state.accounts['1'].posts['112']]);
@@ -71,3 +71,24 @@ for (const [name, kind] of [['account_overview_analytics.csv', 'overview'], ['ac
     assert.equal(kind === 'overview' ? Object.keys(parsed.days).length : parsed.posts.length, rows);
   });
 }
+
+test('CSV edge cases fail with a clear message', () => {
+  assert.throws(() => parseCsvRows('a,b\n"open,1'), /unclosed quote/);
+  const localized = 'Date,Impressions,Unfollows\n24/10/2026,5,0';
+  assert.throws(() => parseAnalyticsCsv(localized), /No rows could be read/);
+  assert.deepEqual(parseCsvRows('a,b\r\n1,2\r\n'), [['a', 'b'], ['1', '2']]);
+});
+
+test('a CSV import never lowers synced numbers and adds no growth snapshot', () => {
+  const synced = { id: '111', createdAt: Date.parse('2026-10-24T09:30:00Z'), text: 'x', kind: 'post', replyTo: null, hashtags: [], links: 0, media: [], metrics: { Impressions: 900, Likes: 3 } };
+  let state = applyCapture(emptyAnalytics(), { operation: 'contentPageQuery', accountId: '1', posts: [synced], profile: {} }, { now: 1 });
+  const csv = parseAnalyticsCsv(CONTENT);
+  state = applyCapture(state, { operation: 'contentPageQuery', accountId: '1', posts: csv.posts, profile: {} }, { now: 2, source: 'csv' });
+  const post = state.accounts['1'].posts['111'];
+  assert.equal(post.metrics.Impressions, 900);
+  assert.equal(post.metrics.Follows, 2);
+  assert.equal(post.snapshots.length, 1);
+  state = applyCapture(state, { operation: 'accountOverviewDailyQuery', accountId: '1', days: { '2026-10-24': { Impressions: 50 } } }, { now: 3 });
+  state = applyCapture(state, { operation: 'accountOverviewDailyQuery', accountId: '1', days: parseAnalyticsCsv(OVERVIEW).days }, { now: 4, source: 'csv' });
+  assert.equal(state.accounts['1'].daily['2026-10-24'].Impressions, 1200);
+});

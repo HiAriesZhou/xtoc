@@ -3,6 +3,7 @@
 // content dates have no time of day, so those posts are marked dayOnly.
 const MAX_TEXT = 1000;
 const MAX_ROWS = 5000;
+const NO_ROWS = 'No rows could be read. XTOC reads X’s English-format dates such as “Sat, Oct 24, 2026”.';
 
 // RFC 4180-style rows: quoted fields, "" escapes, newlines inside quotes.
 export function parseCsvRows(text) {
@@ -31,6 +32,7 @@ export function parseCsvRows(text) {
       field = '';
     } else field += c;
   }
+  if (quoted) throw new Error('The CSV file has an unclosed quote; export it from X again.');
   if (field !== '' || row.length) {
     row.push(field);
     rows.push(row);
@@ -107,6 +109,7 @@ export function parseAnalyticsCsv(text) {
         };
       })
       .filter(Boolean);
+    if (!posts.length) throw new Error(NO_ROWS);
     const handle = records.map((r) => String(r['Post Link']).match(/^https:\/\/(?:x|twitter)\.com\/(\w{1,15})\/status\//)?.[1]).find(Boolean) || '';
     return { kind: 'content', posts, profile: { handle, name: '', avatar: '' } };
   }
@@ -116,6 +119,7 @@ export function parseAnalyticsCsv(text) {
       const ms = utcDay(record.Date);
       if (ms !== null) days[new Date(ms).toISOString().slice(0, 10)] = metricsOf(record);
     }
+    if (!Object.keys(days).length) throw new Error(NO_ROWS);
     return { kind: 'overview', days };
   }
   throw new Error('This is not an X Analytics export (account overview or content CSV).');

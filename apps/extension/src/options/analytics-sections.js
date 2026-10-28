@@ -326,9 +326,12 @@ function postDetailBlock(account, post, detail) {
     const peak = points.reduce((best, p) => (p.value > best.value ? p : best), points[0]);
     let running = 0;
     const half = points.find((p) => (running += p.value) >= total / 2);
-    const hoursAfter = (p) => Math.max(0, Math.round((p.at - post.createdAt) / 3600000));
+    // CSV posts have only a day, so hours are counted from the first hour X reported.
+    const startAt = post.dayOnly ? points[0].at : post.createdAt;
+    const hoursAfter = (p) => Math.max(0, Math.round((p.at - startAt) / 3600000));
+    const since = post.dayOnly ? 'into the series' : 'after posting';
     parts.push(`<div><h3>First 48 hours</h3>${sparkline(points.map((p) => p.value), { width: 320, height: 48 })}
-      <p class="subtle">${esc(`${format(total)} impressions in the first 48 hours; the busiest hour was ${hoursAfter(peak)} h after posting (${format(peak.value)}), and half arrived within ${hoursAfter(half)} h.`)}</p></div>`);
+      <p class="subtle">${esc(`${format(total)} impressions in the first 48 hours; the busiest hour was ${hoursAfter(peak)} h ${since} (${format(peak.value)}), and half arrived within ${hoursAfter(half)} h.`)}</p></div>`);
   }
   const audience = detail.audience || {};
   const rows = (map, labelOf) =>

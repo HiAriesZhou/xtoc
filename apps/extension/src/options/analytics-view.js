@@ -198,18 +198,26 @@ export function createAnalyticsView(ctx) {
     }
   }
 
-  async function importFiles(files) {
-    for (const file of files) {
-      const result = await ctx.rpc('analytics:importCsv', { text: await file.text(), accountId: view.accountId });
-      ctx.toast(result.kind === 'content' ? `Imported ${result.posts} posts from ${file.name}.` : `Imported ${result.days} days from ${file.name}.`);
+  const MAX_CSV_BYTES = 10 * 1024 * 1024;
+
+  async function importFiles(input) {
+    const files = [...input.files];
+    input.value = ''; // the same file can be chosen again
+    try {
+      for (const file of files) {
+        if (file.size > MAX_CSV_BYTES) throw new Error(`${file.name} is larger than 10 MB.`);
+        const result = await ctx.rpc('analytics:importCsv', { text: await file.text(), accountId: view.accountId });
+        ctx.toast(result.kind === 'content' ? `Imported ${result.posts} posts from ${file.name}.` : `Imported ${result.days} days from ${file.name}.`);
+      }
+    } finally {
+      await reload();
+      render();
     }
-    await reload();
-    render();
   }
 
   function onChange(event) {
     const action = event.target.dataset.action;
-    if (action === 'import-csv') return ctx.guard(() => importFiles([...event.target.files]))();
+    if (action === 'import-csv') return ctx.guard(() => importFiles(event.target))();
     if (action === 'sort') view.sort = event.target.value;
     if (action === 'account') {
       view.accountId = event.target.value;

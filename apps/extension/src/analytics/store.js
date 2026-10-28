@@ -45,11 +45,19 @@ const keepRecent = (map, keepDays, now, keyMs) =>
 
 const hourMs = (key) => Date.parse(`${key}:00:00Z`);
 
-function mergeBuckets(current = {}, incoming = {}) {
+// Per metric, the larger value. CSV exports can be older than a sync, and
+// X's totals only grow, so an import never lowers a synced number.
+function maxMetrics(current = {}, incoming = {}) {
+  const out = { ...current };
+  for (const [name, value] of Object.entries(incoming)) out[name] = Math.max(current[name] || 0, value);
+  return out;
+}
+
+function mergeBuckets(current = {}, incoming = {}, keepLarger = false) {
   const merged = { ...current };
   for (const [key, values] of Object.entries(incoming)) {
     if (RESERVED.includes(key)) continue;
-    merged[key] = { ...current[key], ...values };
+    merged[key] = keepLarger ? maxMetrics(current[key], values) : { ...current[key], ...values };
   }
   return merged;
 }
@@ -74,17 +82,21 @@ function capPosts(posts) {
   return Object.fromEntries(kept.map((post) => [post.id, post]));
 }
 
-function mergePosts(current = {}, posts, now) {
+function mergePosts(current = {}, posts, now, fromCsv = false) {
   const merged = { ...current };
   for (const post of posts) {
     const previous = current[post.id];
-    // A CSV row has only the day; keep what an earlier capture knew precisely.
-    const base = post.dayOnly && previous && !previous.dayOnly ? { ...previous, metrics: { ...previous.metrics, ...post.metrics } } : post;
+    // A CSV row has only the day and may be older: keep what a capture knew
+    // precisely, never lower a metric, and record no growth snapshot.
+    const base =
+      fromCsv && previous
+        ? { ...(previous.dayOnly ? post : previous), metrics: maxMetrics(previous.metrics, post.metrics) }
+        : post;
     merged[post.id] = {
       ...base,
       firstSeenAt: previous?.firstSeenAt || now,
       updatedAt: now,
-      snapshots: addSnapshot(previous?.snapshots, base.metrics, now)
+      snapshots: fromCsv ? previous?.snapshots || [] : addSnapshot(previous?.snapshots, base.metrics, now)
     };
   }
   return merged;
@@ -121,7 +133,8 @@ function mergeFollowers(current = {}, info, now) {
   };
 }
 
-function applyToAccount(account, parsed, now) {
+function applyToAccount(account, parsed, now, source) {
+  const fromCsv = source === 'csv';
   const next = { ...account, id: account.id, updatedAt: now };
   if (parsed.account && Object.keys(parsed.account).length) {
     next.info = { ...account.info, ...parsed.account, capturedAt: now };
@@ -129,7 +142,7 @@ function applyToAccount(account, parsed, now) {
   }
   switch (parsed.operation) {
     case OPERATIONS.overviewDaily:
-      next.daily = mergeBuckets(account.daily, parsed.days);
+      next.daily = mergeBuckets(account.daily, parsed.days, fromCsv);
       break;
     case OPERATIONS.overviewHourly:
       next.hourly = keepRecent(mergeBuckets(account.hourly, parsed.hours), HOURLY_KEEP_DAYS, now, hourMs);
@@ -145,7 +158,7 @@ function applyToAccount(account, parsed, now) {
       next.heatmap = keepRecent(mergeBuckets(account.heatmap, parsed.heatmap), HEATMAP_KEEP_DAYS, now, hourMs);
       break;
     case OPERATIONS.content:
-      next.posts = capPosts(mergePosts(account.posts, parsed.posts, now));
+      next.posts = capPosts(mergePosts(account.posts, parsed.posts, now, fromCsv));
       if (parsed.profile?.handle) {
         next.handle = parsed.profile.handle;
         next.name = parsed.profile.name;
@@ -168,7 +181,7 @@ function applyToAccount(account, parsed, now) {
 
 // accountHint is the account seen earlier in the same tab, for responses that
 // do not carry an ID of their own.
-export function applyCapture(state, parsed, { now = Date.now(), accountHint = '' } = {}) {
+export function applyCapture(state, parsed, { now = Date.now(), accountHint = '', source = 'capture' } = {}) {
   const id = parsed.accountId || accountHint;
   if (!validAccountId(id)) throw new Error('Could not tell which X account this data belongs to.');
   if (!state.accounts[id] && Object.keys(state.accounts).length >= MAX_ACCOUNTS)
@@ -176,7 +189,7 @@ export function applyCapture(state, parsed, { now = Date.now(), accountHint = ''
   const current = state.accounts[id] || { id };
   return {
     ...state,
-    accounts: { ...state.accounts, [id]: applyToAccount(current, parsed, now) }
+    accounts: { ...state.accounts, [id]: applyToAccount(current, parsed, now, source) }
   };
 }
 

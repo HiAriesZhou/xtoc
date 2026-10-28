@@ -94,6 +94,7 @@ export function growthCurve(post) {
 // Hours until the post had half of its latest impressions, interpolated
 // between snapshots. Null when the first snapshot already passed half.
 export function halfLife(post) {
+  if (post.dayOnly) return null; // CSV posts have no time of day
   const curve = growthCurve(post);
   const latest = curve.at(-1)?.impressions || 0;
   if (curve.length < 2 || !latest) return null;
