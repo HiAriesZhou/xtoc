@@ -91,3 +91,19 @@ test('on notifications pages the tap reports operation names it sees, without bo
   await flush();
   assert.equal(posted.length, quiet);
 });
+
+test('a reused XHR reports each response under its own operation', async () => {
+  const xhr = new XMLHttpRequest();
+  const first = 'https://x.com/i/api/graphql/q/accountOverviewDailyQuery';
+  const second = 'https://x.com/i/api/graphql/q/audienceOverviewDataQuery';
+  responses.set(first, { data: { a: 1 } });
+  responses.set(second, { data: { b: 2 } });
+  const before = posted.length;
+  xhr.open('GET', first);
+  xhr.send();
+  await flush();
+  xhr.open('GET', second);
+  xhr.send();
+  await flush();
+  assert.deepEqual(posted.slice(before).filter((m) => m.type === 'capture').map((m) => m.capture.operation), ['accountOverviewDailyQuery', 'audienceOverviewDataQuery']);
+});

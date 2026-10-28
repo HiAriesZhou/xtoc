@@ -8,20 +8,23 @@ import { analyticsOperation, graphqlOperationName, isDiagnosticPath } from '../a
 
 const TAP = 'xtoc-tap';
 const BRIDGE = 'xtoc-bridge';
-const MAX_BUFFER = 40;
+const MAX_CAPTURES = 12;
+const MAX_SEEN = 40;
 
 function install() {
-  const buffer = [];
+  // Separate buffers, so diagnostic name reports never push out a capture
+  // that a sync is waiting for.
+  const captures = [];
+  const names = [];
   let bridgeReady = false;
 
   const post = (message) => window.postMessage({ source: TAP, ...message }, location.origin);
 
   function send(message) {
-    if (bridgeReady) post(message);
-    else {
-      buffer.push(message);
-      if (buffer.length > MAX_BUFFER) buffer.shift();
-    }
+    if (bridgeReady) return post(message);
+    const buffer = message.type === 'capture' ? captures : names;
+    buffer.push(message);
+    if (buffer.length > (message.type === 'capture' ? MAX_CAPTURES : MAX_SEEN)) buffer.shift();
   }
 
   const emit = (operation, body) => send({ type: 'capture', capture: { operation, body, at: Date.now() } });
@@ -46,7 +49,8 @@ function install() {
   window.addEventListener('message', (event) => {
     if (event.source !== window || event.data?.source !== BRIDGE || event.data.type !== 'ready') return;
     bridgeReady = true;
-    buffer.splice(0).forEach(post);
+    captures.splice(0).forEach(post);
+    names.splice(0).forEach(post);
   });
 
   const requestUrl = (input) => (typeof input === 'string' ? input : input?.url || String(input));
@@ -81,7 +85,17 @@ function install() {
     this.__xtocUrl = url;
     return open.call(this, method, url, ...rest);
   };
+  // One listener per XHR object; it reads the URL of the request that just
+  // finished, so a reused object never reports an earlier operation.
   XMLHttpRequest.prototype.send = function (...args) {
+    if (!this.__xtocListening) {
+      this.__xtocListening = true;
+      this.addEventListener('load', onXhrLoad);
+    }
+    return xhrSend.apply(this, args);
+  };
+
+  function onXhrLoad() {
     const url = this.__xtocUrl;
     let operation = null;
     try {
@@ -89,20 +103,17 @@ function install() {
     } catch {
       operation = null;
     }
-    this.addEventListener('load', () => {
-      try {
-        const meta = { status: this.status, contentType: this.getResponseHeader?.('content-type') };
-        if (!operation) return seen(url, meta, 'not captured');
-        if (this.status < 200 || this.status >= 300) return seen(url, meta, 'http error');
-        const body = this.responseType === 'json' ? this.response : JSON.parse(this.responseText);
-        if (body) emit(operation, body);
-        seen(url, meta, 'captured');
-      } catch {
-        // Not JSON or not readable; skip.
-      }
-    });
-    return xhrSend.apply(this, args);
-  };
+    try {
+      const meta = { status: this.status, contentType: this.getResponseHeader?.('content-type') };
+      if (!operation) return seen(url, meta, 'not captured');
+      if (this.status < 200 || this.status >= 300) return seen(url, meta, 'http error');
+      const body = this.responseType === 'json' ? this.response : JSON.parse(this.responseText);
+      if (body) emit(operation, body);
+      seen(url, meta, 'captured');
+    } catch {
+      // Not JSON or not readable; skip.
+    }
+  }
 }
 
 if (!window.__xtocTapInstalled) {
