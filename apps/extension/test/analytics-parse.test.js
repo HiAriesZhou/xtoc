@@ -4,6 +4,8 @@ import {
   analyticsOperation,
   autoSyncDue,
   contentRange,
+  graphqlOperationName,
+  isDiagnosticPath,
   isAnalyticsPage,
   isCapturePage,
   isPremiumRedirect,
@@ -174,4 +176,12 @@ test('isCapturePage keeps the notifications operation to the Mentions page', () 
   assert.equal(isCapturePage('https://x.com/notifications', 'notificationsQuery'), false);
   assert.equal(isCapturePage('https://x.com/i/account_analytics', 'notificationsQuery'), false);
   assert.equal(isCapturePage('https://x.com/i/account_analytics', 'contentPageQuery'), true);
+});
+
+test('graphqlOperationName and isDiagnosticPath', () => {
+  assert.equal(graphqlOperationName('https://api.x.com/graphql/q1/notificationsQuery?v=1'), 'notificationsQuery');
+  assert.equal(graphqlOperationName('https://evil.test/graphql/q1/x'), null);
+  assert.equal(isDiagnosticPath('/notifications/mentions'), true);
+  assert.equal(isDiagnosticPath('/i/account_analytics/content/'), true);
+  assert.equal(isDiagnosticPath('/home'), false);
 });

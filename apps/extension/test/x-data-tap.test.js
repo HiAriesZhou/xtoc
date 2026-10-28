@@ -32,7 +32,7 @@ const page = {
   }
 };
 globalThis.window = page;
-globalThis.location = { origin: 'https://x.com' };
+globalThis.location = { origin: 'https://x.com', pathname: '/home' };
 globalThis.XMLHttpRequest = FakeXHR;
 const nativeFetch = page.fetch;
 
@@ -75,4 +75,19 @@ test('installing twice does not wrap fetch twice', async () => {
   const wrapped = window.fetch;
   await import('../src/content/x-data-tap.js?again');
   assert.equal(window.fetch, wrapped);
+});
+
+test('on notifications pages the tap reports operation names it sees, without bodies', async () => {
+  location.pathname = '/notifications/mentions';
+  const before = posted.length;
+  await window.fetch('https://api.x.com/graphql/abc/SomeTimelineQuery');
+  await flush();
+  const seen = posted.slice(before).filter((m) => m.type === 'seen').map((m) => m.seen);
+  assert.deepEqual(seen, [{ operation: 'SomeTimelineQuery', status: 404, contentType: 'text/plain;charset=UTF-8', read: 'not captured' }]);
+  assert.ok(posted.slice(before).every((m) => !m.capture));
+  location.pathname = '/home';
+  const quiet = posted.length;
+  await window.fetch('https://api.x.com/graphql/abc/SomeTimelineQuery');
+  await flush();
+  assert.equal(posted.length, quiet);
 });

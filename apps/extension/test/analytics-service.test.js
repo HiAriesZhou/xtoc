@@ -187,3 +187,12 @@ test('diagnostics record shapes and outcomes per operation, without values', asy
   assert.equal(report.accounts[0].posts, 1);
   assert.doesNotMatch(JSON.stringify(report), /private words|example/);
 });
+
+test('seen operation names are kept for diagnostics, capped', async () => {
+  const { service } = harness();
+  for (let i = 0; i < 90; i++) await service.seen({ operation: `Op${i}`, status: 200, contentType: 'application/json', read: 'not captured' }, fromTab(1, 'https://x.com/notifications/mentions'));
+  const report = await service.diagnostics();
+  assert.equal(report.seen.length, 80);
+  assert.deepEqual(Object.keys(report.seen.at(-1)).sort(), ['at', 'contentType', 'operation', 'path', 'read', 'status']);
+  assert.equal(report.seen.at(-1).path, '/notifications/mentions');
+});

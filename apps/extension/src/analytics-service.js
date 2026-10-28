@@ -211,6 +211,32 @@ export function createAnalyticsService({
     }
   });
 
+  // Operation names seen on analytics and notifications pages (no content).
+  let seenOps = [];
+  async function recordSeen(payload, sender) {
+    let path = '';
+    try {
+      path = new URL(sender.url).pathname;
+    } catch {
+      // No page URL.
+    }
+    const entry = {
+      at: new Date(now()).toISOString(),
+      path: path.slice(0, 80),
+      operation: String(payload.operation).slice(0, 80),
+      status: Number(payload.status) || 0,
+      contentType: String(payload.contentType || '').slice(0, 80),
+      read: String(payload.read || '').slice(0, 20)
+    };
+    seenOps = [...seenOps, entry].slice(-80);
+    try {
+      await session?.set({ [`${DIAGNOSTICS_KEY}Seen`]: seenOps });
+    } catch {
+      // In-memory copy remains.
+    }
+    return {};
+  }
+
   async function readDiagnostics() {
     try {
       const saved = (await session?.get(DIAGNOSTICS_KEY))?.[DIAGNOSTICS_KEY];
@@ -218,10 +244,17 @@ export function createAnalyticsService({
     } catch {
       // Use the in-memory copy.
     }
+    try {
+      const savedSeen = (await session?.get(`${DIAGNOSTICS_KEY}Seen`))?.[`${DIAGNOSTICS_KEY}Seen`];
+      if (savedSeen?.length > seenOps.length) seenOps = savedSeen;
+    } catch {
+      // Use the in-memory copy.
+    }
     const { data, sync } = await load();
     return {
       generatedAt: new Date(now()).toISOString(),
       captures: diagnostics,
+      seen: seenOps,
       sync,
       accounts: Object.values(data.accounts).map(accountSummary)
     };
@@ -231,6 +264,7 @@ export function createAnalyticsService({
     load,
     recover,
     diagnostics: readDiagnostics,
+    seen: recordSeen,
     async capture(payload, sender) {
       const tabId = sender.tab?.id;
       if (!KNOWN.has(payload.operation)) throw new Error('Unsupported analytics operation.');

@@ -263,8 +263,9 @@ async function dispatch(message, sender) {
     if (!fromXPage(sender)) throw new Error('Saving must start on X.');
     return transaction((state) => mutate(state, action.slice('library:'.length), payload));
   }
-  if (action === 'analytics:capture' || action === 'analytics:visit') {
+  if (action === 'analytics:capture' || action === 'analytics:visit' || action === 'analytics:seen') {
     if (!fromXPage(sender)) throw new Error('Analytics data must come from X.');
+    if (action === 'analytics:seen') return analytics.seen(payload, sender);
     return action === 'analytics:capture' ? analytics.capture(payload, sender) : analytics.visit();
   }
   if (['import:status', 'import:checkpoint', 'import:finish'].includes(action)) {

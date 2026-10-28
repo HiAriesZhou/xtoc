@@ -12,7 +12,16 @@ export function initAnalyticsBridge() {
   function onMessage(event) {
     if (event.source !== window || event.origin !== location.origin) return;
     const data = event.data;
-    if (data?.source !== TAP || data.type !== 'capture') return;
+    if (data?.source !== TAP) return;
+    if (data.type === 'seen') {
+      const { operation, status, contentType, read } = data.seen || {};
+      if (typeof operation !== 'string') return;
+      chrome.runtime
+        .sendMessage({ action: 'analytics:seen', payload: { operation, status, contentType, read } })
+        .catch(() => {});
+      return;
+    }
+    if (data.type !== 'capture') return;
     const { operation, body } = data.capture || {};
     if (!KNOWN.has(operation) || !body || typeof body !== 'object') return;
     chrome.runtime

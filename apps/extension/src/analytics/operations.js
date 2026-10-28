@@ -29,6 +29,20 @@ export function analyticsOperation(value) {
   return match && NAMES.has(match[1]) ? match[1] : null;
 }
 
+// Any GraphQL operation name, used only to report which operations a page
+// loads (diagnostics); responses are captured only for the names above.
+export function graphqlOperationName(value) {
+  try {
+    const url = new URL(String(value), 'https://x.com');
+    if (url.protocol !== 'https:' || !HOSTS.includes(url.hostname)) return null;
+    return url.pathname.match(/^(?:\/i\/api)?\/graphql\/[\w-]+\/(\w{1,80})\/?$/)?.[1] || null;
+  } catch {
+    return null;
+  }
+}
+
+export const isDiagnosticPath = (path) => /^\/(?:i\/account_analytics|notifications)(?:\/|$)/.test(String(path));
+
 export const ANALYTICS_ORIGIN = 'https://x.com';
 
 // Captures are accepted only from X's own analytics pages, the Mentions page
