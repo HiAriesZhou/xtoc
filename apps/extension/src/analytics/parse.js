@@ -266,7 +266,8 @@ function droppedRows(rows) {
     const tweet = unwrapTweet(item?.result);
     let reason = '';
     if (!tweet) reason = 'no result';
-    else if (tweet.__typename && tweet.__typename !== 'Tweet') reason = `type ${str(String(tweet.__typename), 40)}`;
+    else if (tweet.__typename && tweet.__typename !== 'Tweet')
+      reason = `type ${str(String(tweet.__typename), 40)} (${Object.keys(tweet).sort().join(' ').slice(0, 120)})`;
     else if (!/^\d+$/.test(str(tweet.rest_id || item?.rest_id, 25))) reason = 'no id';
     else if (toMs(tweet.details?.created_at_ms) === null) reason = 'no time';
     if (reason) reasons[reason] = (reasons[reason] || 0) + 1;
