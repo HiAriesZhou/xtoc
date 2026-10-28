@@ -17,7 +17,7 @@ listing:
     - assets/screenshots/03-export-1280x800.png
   globalPromoVideoUrl: null
   officialUrl: null
-  homepageUrl: https://x-toc.vercel.app/
+  homepageUrl: https://xtoc.arieszhou.com/
   supportUrl: null
   matureContent: false
 privacy:
@@ -44,7 +44,7 @@ privacy:
     noSaleOrTransfer: true
     relatedToSinglePurpose: true
     noCreditworthinessUse: true
-  policyUrl: https://x-toc.vercel.app/privacy
+  policyUrl: https://xtoc.arieszhou.com/privacy
 stores:
   firefox:
     summary: >-

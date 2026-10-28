@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { DM_Sans, Libre_Caslon_Display } from "next/font/google";
 import "./globals.css";
+import { siteUrl } from "@/lib/seo";
 
 const uiFont = DM_Sans({
   subsets: ["latin"],
@@ -16,7 +17,7 @@ const displayFont = Libre_Caslon_Display({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://x-toc.vercel.app"),
+  metadataBase: new URL(siteUrl),
   title: {
     default: "XTOC | Navigate and Clip X Articles",
     template: "%s | XTOC",
@@ -64,8 +65,8 @@ export default function RootLayout({
       <body className={`${uiFont.variable} ${displayFont.variable}`}>
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
           "@context": "https://schema.org", "@type": "SoftwareApplication",
-          "@id": "https://x-toc.vercel.app/#software", name: "XTOC", alternateName: "X-TOC",
-          url: "https://x-toc.vercel.app/", applicationCategory: "BrowserApplication",
+          "@id": `${siteUrl}/#software`, name: "XTOC", alternateName: "X-TOC",
+          url: `${siteUrl}/`, applicationCategory: "BrowserApplication",
           softwareRequirements: "Desktop Chrome; supported X/Twitter long-form articles",
           description: "A table of contents for X Articles with local clips, tags, notes, and Markdown or JSON export.",
           downloadUrl: "https://chromewebstore.google.com/detail/nbdgpckkcfkomnmdefinikjijgljgjfp",

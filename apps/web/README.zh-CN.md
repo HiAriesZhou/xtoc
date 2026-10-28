@@ -34,7 +34,7 @@ XTOC 为 X/Twitter 长文提供文章目录、可移动阅读面板和轻量本�
 - 使用 `chrome.storage.local` 在本地保存 clips。
 - 不会把已保存 clips 发送到外部服务器。
 
-- 隐私政策: [x-toc.vercel.app/privacy](https://x-toc.vercel.app/privacy)
+- 隐私政策: [xtoc.arieszhou.com/privacy](https://xtoc.arieszhou.com/privacy)
 
 ## 开发
 

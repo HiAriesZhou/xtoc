@@ -33,7 +33,7 @@ https://github.com/user-attachments/assets/b107995f-3b2a-4432-9530-48a93c886aa3
 
 Watch the 40-second demo: navigate an article, save passages, edit tags and notes, and export clips.
 
-[Try the interactive demo](https://x-toc.vercel.app/)
+[Try the interactive demo](https://xtoc.arieszhou.com/)
 
 ## How it works
 
@@ -103,7 +103,7 @@ Saved text, clips, tags, notes, settings and bookmark import progress (your X ha
 
 ## Project links
 
-[Product website](https://x-toc.vercel.app) · [Project story](https://www.arieszhou.com/projects/x-toc) · [Contributing](apps/extension/CONTRIBUTING.md)
+[Product website](https://xtoc.arieszhou.com) · [Project story](https://www.arieszhou.com/building#x-toc) · [Contributing](apps/extension/CONTRIBUTING.md)
 
 ## License
 

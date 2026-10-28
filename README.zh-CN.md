@@ -33,7 +33,7 @@ https://github.com/user-attachments/assets/b107995f-3b2a-4432-9530-48a93c886aa3
 
 观看约 40 秒演示：目录导航、保存摘录、编辑标签与笔记，以及导出。
 
-[体验交互演示](https://x-toc.vercel.app/)
+[体验交互演示](https://xtoc.arieszhou.com/)
 
 ## 使用方式
 
@@ -103,7 +103,7 @@ Chrome、Edge 和 Firefox 版本已在各自商店发布。Chromium、Firefox �
 
 ## 项目链接
 
-[产品网站](https://x-toc.vercel.app) · [项目案例](https://www.arieszhou.com/zh/projects/x-toc) · [参与贡献](apps/extension/CONTRIBUTING.md)
+[产品网站](https://xtoc.arieszhou.com) · [项目案例](https://www.arieszhou.com/zh/building#x-toc) · [参与贡献](apps/extension/CONTRIBUTING.md)
 
 ## 许可证
 

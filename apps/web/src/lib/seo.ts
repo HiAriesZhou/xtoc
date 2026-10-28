@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-export const siteUrl = "https://x-toc.vercel.app";
+export const siteUrl = "https://xtoc.arieszhou.com";
 export const viewPaths = { home: "/", article: "/article", clips: "/clips", docs: "/docs" } as const;
 export const viewMeta = {
   home: { title: "XTOC | Table of Contents & Clips for X Articles", description: "XTOC adds a table of contents to X Articles. Save passages locally with tags and notes, then export your clips as Markdown or JSON." },
