@@ -34,7 +34,7 @@ test('contentRange backfills a year first, then only what is new with overlap', 
 
 test('syncSteps visit content, audience and overview with their expected operations', () => {
   const steps = syncSteps(null, Date.parse('2026-10-26T12:00:00Z'));
-  assert.deepEqual(steps.map((s) => s.expect), ['contentPageQuery', 'audienceOverviewDataQuery', 'accountOverviewDailyQuery', 'notificationsQuery']);
+  assert.deepEqual(steps.map((s) => s.expect), ['contentPageQuery', 'audienceOverviewDataQuery', 'accountOverviewDailyQuery', 'NotificationsTimeline']);
   assert.deepEqual(steps.map((s) => Boolean(s.optional)), [false, false, false, true]);
   assert.match(steps[0].url, /^https:\/\/x\.com\/i\/account_analytics\/content\/\?type=all&from=2025-10-27&to=2026-10-26$/);
   assert.deepEqual(steps[0].range, { from: '2025-10-27', to: '2026-10-26' });
@@ -184,4 +184,36 @@ test('graphqlOperationName and isDiagnosticPath', () => {
   assert.equal(isDiagnosticPath('/notifications/mentions'), true);
   assert.equal(isDiagnosticPath('/i/account_analytics/content/'), true);
   assert.equal(isDiagnosticPath('/home'), false);
+});
+
+test('legacy NotificationsTimeline: tweets anywhere under data, quoted tweets skipped, no account ID', () => {
+  const tweet = (id, handle, extra = {}) => ({
+    __typename: 'Tweet',
+    rest_id: id,
+    core: { user_results: { result: { __typename: 'User', legacy: { screen_name: handle } } } },
+    legacy: { created_at: 'Tue Oct 28 08:00:00 +0000 2026', ...extra }
+  });
+  const body = {
+    data: {
+      viewer: {
+        timeline: {
+          timeline: {
+            instructions: [
+              {
+                entries: [
+                  { content: { itemContent: { tweet_results: { result: { ...tweet('701', 'Dana', { in_reply_to_status_id_str: '9' }), quoted_status_result: { result: tweet('702', 'quoted_person') } } } } } },
+                  { content: { itemContent: { tweet_results: { result: tweet('703', 'erin') } } } }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    }
+  };
+  const parsed = parseCapture('NotificationsTimeline', body);
+  assert.equal(parsed.operation, 'NotificationsTimeline');
+  assert.equal(parsed.accountId, '');
+  assert.deepEqual(parsed.mentions.map((m) => [m.id, m.handle, m.kind]).sort(), [['701', 'dana', 'reply'], ['703', 'erin', 'mention']]);
+  assert.throws(() => parseCapture('NotificationsTimeline', { errors: [] }), /no mentions data/);
 });

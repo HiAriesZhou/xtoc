@@ -78,7 +78,13 @@ export function createAnalyticsService({
     const parsed = parseCapture(operation, body);
     await enqueue(async () => {
       const state = readAnalytics(await read(ANALYTICS_KEYS.data));
-      const next = applyCapture(state, parsed, { now: now(), accountHint: tabAccounts.get(tabId) });
+      // Mentions carry no account ID: use the account seen in this tab, the
+      // account of the running sync, or the only stored account.
+      const only = Object.keys(state.accounts).length === 1 ? Object.keys(state.accounts)[0] : '';
+      const hint =
+        tabAccounts.get(tabId) ||
+        (parsed.operation === OPERATIONS.mentions ? (run && tabId === run.tabId && run.accountId) || only : '');
+      const next = applyCapture(state, parsed, { now: now(), accountHint: hint });
       try {
         await storage.set({ [ANALYTICS_KEYS.data]: next });
       } catch {
@@ -147,7 +153,8 @@ export function createAnalyticsService({
   function onCapture(tabId, operation, parsed) {
     if (!run || tabId !== run.tabId || run.settle) return;
     const step = run.steps[run.index];
-    if (operation !== step.expect) return;
+    if (operation !== step.expect && !step.alsoExpect?.includes(operation)) return;
+    if (parsed.accountId) run.accountId = parsed.accountId;
     if (operation === OPERATIONS.content && parsed.rowCount >= CONTENT_PAGE_LIMIT && run.steps.length < MAX_STEPS) {
       const oldest = Math.min(...parsed.posts.map((post) => post.createdAt));
       const older = olderContentStep(step.range, oldest);

@@ -7,10 +7,14 @@ export const OPERATIONS = {
   activeFollowers: 'activeFollowersTileQuery',
   audience: 'audienceOverviewDataQuery',
   content: 'contentPageQuery',
-  // Notifications timeline; kept only from the Mentions page (who replied to or
-  // mentioned the user). Not an analytics operation, so it has its own page rule.
-  mentions: 'notificationsQuery'
+  // Mentions timeline (who replied to or mentioned the user), kept only from
+  // the Mentions page. A live check showed that page loads NotificationsTimeline;
+  // notificationsQuery is the newer client's name for the same timeline.
+  mentions: 'NotificationsTimeline',
+  mentionsRelay: 'notificationsQuery'
 };
+
+export const MENTION_OPERATIONS = new Set([OPERATIONS.mentions, OPERATIONS.mentionsRelay]);
 
 const NAMES = new Set(Object.values(OPERATIONS));
 const HOSTS = ['x.com', 'api.x.com', 'twitter.com', 'api.twitter.com'];
@@ -59,7 +63,7 @@ export function isAnalyticsPage(value) {
 export const MENTIONS_URL = 'https://x.com/notifications/mentions';
 
 export function isCapturePage(value, operation) {
-  if (operation !== OPERATIONS.mentions) return isAnalyticsPage(value);
+  if (!MENTION_OPERATIONS.has(operation)) return isAnalyticsPage(value);
   try {
     const url = new URL(value);
     return url.protocol === 'https:' && url.hostname === 'x.com' && /^\/notifications\/mentions\/?$/.test(url.pathname);
@@ -105,7 +109,7 @@ export function syncSteps(lastSuccessAt, now = Date.now()) {
       expect: OPERATIONS.overviewDaily
     },
     // Optional: a missing Mentions timeline never fails the sync.
-    { id: 'mentions', url: MENTIONS_URL, expect: OPERATIONS.mentions, optional: true }
+    { id: 'mentions', url: MENTIONS_URL, expect: OPERATIONS.mentions, alsoExpect: [OPERATIONS.mentionsRelay], optional: true }
   ];
 }
 

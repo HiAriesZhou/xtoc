@@ -196,3 +196,12 @@ test('seen operation names are kept for diagnostics, capped', async () => {
   assert.deepEqual(Object.keys(report.seen.at(-1)).sort(), ['at', 'contentType', 'operation', 'path', 'read', 'status']);
   assert.equal(report.seen.at(-1).path, '/notifications/mentions');
 });
+
+test('NotificationsTimeline without an account ID is stored for the only account', async () => {
+  const { service } = harness();
+  await service.capture({ operation: 'contentPageQuery', body: content([tweet({ id: '1', createdAt: day0 })]) }, fromTab(1));
+  const body = { data: { viewer: { timeline: { instructions: [{ entries: [{ content: { itemContent: { tweet_results: { result: { __typename: 'Tweet', rest_id: '801', core: { user_results: { result: { legacy: { screen_name: 'zed' } } } }, legacy: { created_at: 'Tue Oct 28 08:00:00 +0000 2026' } } } } } }] }] } } } };
+  await service.capture({ operation: 'NotificationsTimeline', body }, fromTab(5, 'https://x.com/notifications/mentions'));
+  const { data } = await service.load();
+  assert.equal(data.accounts[ACCOUNT_ID].inbound['801'].handle, 'zed');
+});

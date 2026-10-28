@@ -1,7 +1,7 @@
 // Turns X analytics GraphQL responses into small, typed records. The shapes
 // follow the Relay queries in X's web client (see operations.js); every field is
 // optional here, because X can change them and a partial capture is still useful.
-import { OPERATIONS } from './operations.js';
+import { MENTION_OPERATIONS, OPERATIONS } from './operations.js';
 
 // XTOC metric names, shared by days, hours and posts.
 export const METRICS = [
@@ -290,11 +290,14 @@ function tweetTime(tweet) {
   return toMs(tweet.details?.created_at_ms) ?? toMs(tweet.legacy?.created_at);
 }
 
-// Mentions timeline (a generic URT timeline): every tweet found in it is a
+// Nested tweets that are not themselves replies to or mentions of the user.
+const SKIP_KEYS = new Set(['quoted_status_result', 'retweeted_status_result', 'quotedRefResult']);
+
+// Mentions timeline (a generic timeline): every top-level tweet in it is a
 // reply to or mention of the user. Only author, time and kind are kept.
-function parseMentions(user) {
+function parseMentions(body) {
   const found = new Map();
-  const stack = [[user.notification_timeline, 0]];
+  const stack = [[body?.data, 0]];
   while (stack.length && found.size < MAX_MENTIONS) {
     const [node, depth] = stack.pop();
     if (!node || typeof node !== 'object' || depth > MAX_DEPTH) continue;
@@ -306,7 +309,9 @@ function parseMentions(user) {
         found.set(String(node.rest_id), { id: String(node.rest_id), handle, createdAt, kind: isReply ? 'reply' : 'mention' });
       }
     }
-    for (const value of Object.values(node)) if (value && typeof value === 'object') stack.push([value, depth + 1]);
+    for (const [key, value] of Object.entries(node)) {
+      if (value && typeof value === 'object' && !SKIP_KEYS.has(key)) stack.push([value, depth + 1]);
+    }
   }
   return { mentions: [...found.values()] };
 }
@@ -316,13 +321,18 @@ const PARSERS = {
   [OPERATIONS.overviewHourly]: parseOverviewHourly,
   [OPERATIONS.activeFollowers]: (user) => ({ account: followerInfo(user) }),
   [OPERATIONS.audience]: parseAudience,
-  [OPERATIONS.content]: parseContent,
-  [OPERATIONS.mentions]: parseMentions
+  [OPERATIONS.content]: parseContent
 };
 
 // Returns { operation, accountId, ...parsed } or throws when the response is
 // not something XTOC understands (X changed the page, or an error response).
 export function parseCapture(operation, body) {
+  if (MENTION_OPERATIONS.has(operation)) {
+    // The legacy timeline has no viewer block; the account comes from the tab.
+    if (!body?.data || typeof body.data !== 'object') throw new Error('X returned no mentions data.');
+    const user = viewerUser(body);
+    return { operation: OPERATIONS.mentions, accountId: user ? accountId(user) : '', ...parseMentions(body) };
+  }
   const parse = PARSERS[operation];
   if (!parse) throw new Error('Unsupported analytics operation.');
   const user = viewerUser(body);
