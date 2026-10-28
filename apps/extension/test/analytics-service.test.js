@@ -173,3 +173,17 @@ test('starting a sync records the attempt immediately', async () => {
   assert.equal(data.xtocAnalyticsSync.lastAttemptAt, '2026-10-26T12:00:00.000Z');
   assert.equal(data.xtocAnalyticsSync.running, true);
 });
+
+test('diagnostics record shapes and outcomes per operation, without values', async () => {
+  const { service } = harness();
+  await service.capture({ operation: 'contentPageQuery', body: content([tweet({ id: '1', createdAt: day0, text: 'private words' })]) }, fromTab(1));
+  await service.capture({ operation: 'accountOverviewDailyQuery', body: overviewDaily() }, fromTab(1, 'https://x.com/home'));
+  await assert.rejects(service.capture({ operation: 'audienceOverviewDataQuery', body: { data: null } }, fromTab(1)));
+  const report = await service.diagnostics();
+  assert.deepEqual(report.captures.contentPageQuery.records, { posts: 1 });
+  assert.equal(report.captures.contentPageQuery.path, '/i/account_analytics');
+  assert.equal(report.captures.accountOverviewDailyQuery.accepted, false);
+  assert.match(report.captures.audienceOverviewDataQuery.error, /no analytics data/);
+  assert.equal(report.accounts[0].posts, 1);
+  assert.doesNotMatch(JSON.stringify(report), /private words|example/);
+});

@@ -311,6 +311,7 @@ async function dispatch(message, sender) {
   if (action === 'analytics:sync') return analytics.sync();
   if (action === 'analytics:prefs') return analytics.setPrefs(payload);
   if (action === 'analytics:clear') return analytics.clear(payload);
+  if (action === 'analytics:diagnostics') return analytics.diagnostics();
   if (action === 'ai:suggest' || action === 'ai:test' || action === 'analytics:interpret')
     return runAI(action, payload);
   throw new Error('Unsupported action.');

@@ -61,6 +61,14 @@ export function createSettingsView(ctx) {
     ctx.toast(autoSync ? 'Daily sync is on. It runs the next time you open X.' : 'Daily sync is off.');
   }
 
+  async function downloadDiagnostics() {
+    const report = await ctx.rpc('analytics:diagnostics');
+    const url = URL.createObjectURL(new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' }));
+    const link = Object.assign(document.createElement('a'), { href: url, download: `xtoc-analytics-diagnostics-${Date.now()}.json` });
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
   async function clearAnalytics() {
     if (!confirm('Delete all analytics XTOC stored on this device? Your X account is not affected.')) return;
     await ctx.rpc('analytics:clear', {});
@@ -92,10 +100,15 @@ export function createSettingsView(ctx) {
           <button class="btn btn-secondary" type="button" data-action="seed-load">Load sample clips</button>
           <button class="btn btn-ghost-danger" type="button" data-action="seed-remove">Remove sample data</button>
         </div>
+        <p class="subtle">Analytics diagnostics: the structure of the last X responses (field names and types, no values) and stored counts, for checking the parsers.</p>
+        <div class="inline-actions start">
+          <button class="btn btn-secondary" type="button" data-action="analytics-diagnostics">Download analytics diagnostics</button>
+        </div>
       </section>`;
     createAISettings(ctx, main.querySelector('#aiCard'));
     main.onclick = (event) => {
       if (event.target.closest('[data-action="clear-analytics"]')) return ctx.guard(clearAnalytics)();
+      if (event.target.closest('[data-action="analytics-diagnostics"]')) return ctx.guard(downloadDiagnostics)();
       const action = event.target.closest('#sampleData [data-action]')?.dataset.action;
       if (action) ctx.guard(() => runSeed(action === 'seed-remove' ? 'remove' : 'load'))();
     };

@@ -11,6 +11,7 @@ import {
   syncSteps
 } from './analytics/operations.js';
 import { parseCapture } from './analytics/parse.js';
+import { accountSummary, responseShape } from './analytics/diagnostics.js';
 import { ANALYTICS_KEYS, applyCapture, emptyAnalytics, readAnalytics } from './analytics/store.js';
 
 // Kept under the ~30 s after which an idle MV3 worker may be stopped; a run
@@ -20,8 +21,11 @@ const SETTLE_MS = 2500; // let optional queries on the same page arrive
 const MAX_STEPS = 8;
 const KNOWN = new Set(Object.values(OPERATIONS));
 
+const DIAGNOSTICS_KEY = 'xtocAnalyticsDiagnostics'; // session storage: shapes only
+
 export function createAnalyticsService({
   storage = chrome.storage.local,
+  session = globalThis.chrome?.storage?.session,
   tabs = chrome.tabs,
   now = Date.now,
   stepTimeoutMs = STEP_TIMEOUT_MS,
@@ -31,6 +35,27 @@ export function createAnalyticsService({
   let run = null;
   let starting = null;
   let writes = Promise.resolve(); // analytics writes, separate from the Library queue
+
+  // Last capture per operation, for development diagnostics: field names and
+  // types, page path and outcome. Never values, so it is safe to download.
+  let diagnostics = {};
+  async function note(operation, sender, outcome, body) {
+    let path = '';
+    try {
+      path = new URL(sender.url).pathname;
+    } catch {
+      // No page URL.
+    }
+    diagnostics = {
+      ...diagnostics,
+      [operation]: { at: new Date(now()).toISOString(), path, ...outcome, shape: body === undefined ? null : responseShape(body) }
+    };
+    try {
+      await session?.set({ [DIAGNOSTICS_KEY]: diagnostics });
+    } catch {
+      // Session storage unavailable; the in-memory copy remains.
+    }
+  }
 
   function enqueue(fn) {
     const work = writes.then(fn);
@@ -63,6 +88,13 @@ export function createAnalyticsService({
     if (parsed.accountId && tabId !== undefined) tabAccounts.set(tabId, parsed.accountId);
     return parsed;
   }
+
+  const recordCounts = (parsed) =>
+    Object.fromEntries(
+      ['days', 'hours', 'heatmap', 'posts', 'mentions']
+        .filter((key) => parsed[key] !== undefined)
+        .map((key) => [key, Array.isArray(parsed[key]) ? parsed[key].length : Object.keys(parsed[key]).length])
+    );
 
   async function finish(error) {
     if (!run) return;
@@ -179,16 +211,43 @@ export function createAnalyticsService({
     }
   });
 
+  async function readDiagnostics() {
+    try {
+      const saved = (await session?.get(DIAGNOSTICS_KEY))?.[DIAGNOSTICS_KEY];
+      if (saved) diagnostics = { ...saved, ...diagnostics };
+    } catch {
+      // Use the in-memory copy.
+    }
+    const { data, sync } = await load();
+    return {
+      generatedAt: new Date(now()).toISOString(),
+      captures: diagnostics,
+      sync,
+      accounts: Object.values(data.accounts).map(accountSummary)
+    };
+  }
+
   return {
     load,
     recover,
+    diagnostics: readDiagnostics,
     async capture(payload, sender) {
       const tabId = sender.tab?.id;
       if (!KNOWN.has(payload.operation)) throw new Error('Unsupported analytics operation.');
       // Page scripts can post messages on any x.com page; only analytics pages count.
-      if (!isCapturePage(sender.url, payload.operation) && !(run && tabId === run.tabId)) return { stored: false };
+      if (!isCapturePage(sender.url, payload.operation) && !(run && tabId === run.tabId)) {
+        await note(payload.operation, sender, { accepted: false }, payload.body);
+        return { stored: false };
+      }
       await recover();
-      const parsed = await store(payload.operation, payload.body, tabId);
+      let parsed;
+      try {
+        parsed = await store(payload.operation, payload.body, tabId);
+      } catch (error) {
+        await note(payload.operation, sender, { accepted: true, error: error.message }, payload.body);
+        throw error;
+      }
+      await note(payload.operation, sender, { accepted: true, error: null, records: recordCounts(parsed) }, payload.body);
       onCapture(tabId, payload.operation, parsed);
       return { stored: true };
     },
