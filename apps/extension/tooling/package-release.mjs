@@ -22,8 +22,21 @@ const DEV_ONLY = /^(dev-icons\/|dev\/)/;
 
 export const releaseFileName = (id, version) => `xtoc-${id}-v${version}.zip`;
 
-export function manifestProblems(manifest, target, version) {
+// Every script and stylesheet the manifest names must exist in the build.
+export function missingManifestFiles(manifest, exists) {
+  const background = manifest.background || {};
+  const files = [
+    ...(manifest.content_scripts || []).flatMap((script) => [...(script.js || []), ...(script.css || [])]),
+    ...(background.scripts || []),
+    ...(background.service_worker ? [background.service_worker] : [])
+  ];
+  return [...new Set(files)].filter((file) => !exists(file));
+}
+
+export function manifestProblems(manifest, target, version, exists = () => true) {
   const problems = [];
+  const missing = missingManifestFiles(manifest, exists);
+  if (missing.length) problems.push(`${target.id}: manifest names missing files: ${missing.join(', ')}`);
   if (manifest.version !== version) {
     problems.push(
       `${target.id}: manifest has version ${manifest.version}, package.json has ${version}`
@@ -75,7 +88,9 @@ async function main() {
       continue;
     }
     problems.push(
-      ...manifestProblems(JSON.parse(await readFile(manifestPath, 'utf8')), target, version)
+      ...manifestProblems(JSON.parse(await readFile(manifestPath, 'utf8')), target, version, (file) =>
+        existsSync(path.join(root, target.dir, file))
+      )
     );
   }
   if (problems.length) throw new Error(problems.join('\n'));

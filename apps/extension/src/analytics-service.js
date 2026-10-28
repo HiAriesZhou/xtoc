@@ -1,0 +1,377 @@
+// Background side of XTOC Analytics: stores captures from X's own analytics
+// pages and runs a sync, which opens those pages in an inactive tab so X loads
+// its data and the MAIN-world tap copies it. XTOC sends no requests of its own.
+import {
+  autoSyncDue,
+  CONTENT_PAGE_LIMIT,
+  isCapturePage,
+  isPremiumRedirect,
+  isDiagnosticPath,
+  olderContentStep,
+  OPERATIONS,
+  POST_DETAIL_OPERATIONS,
+  syncSteps
+} from './analytics/operations.js';
+import { parseCapture } from './analytics/parse.js';
+import { accountSummary, responseShape } from './analytics/diagnostics.js';
+import { parseAnalyticsCsv } from './analytics/csv.js';
+import { ANALYTICS_KEYS, applyCapture, emptyAnalytics, readAnalytics } from './analytics/store.js';
+
+// Kept under the ~30 s after which an idle MV3 worker may be stopped; a run
+// lost that way is cleaned up by recover() on the next event.
+const STEP_TIMEOUT_MS = 25000;
+const SETTLE_MS = 2500; // let optional queries on the same page arrive
+const MAX_STEPS = 12;
+const KNOWN = new Set(Object.values(OPERATIONS));
+
+const DIAGNOSTICS_KEY = 'xtocAnalyticsDiagnostics'; // session storage: shapes only
+
+export function createAnalyticsService({
+  storage = chrome.storage.local,
+  session = globalThis.chrome?.storage?.session,
+  tabs = chrome.tabs,
+  now = Date.now,
+  stepTimeoutMs = STEP_TIMEOUT_MS,
+  settleMs = SETTLE_MS,
+  // Diagnostics are collected only in development builds.
+  diagnosticsEnabled = /\(Development\)/.test(globalThis.chrome?.runtime?.getManifest?.()?.name || '')
+}) {
+  const tabAccounts = new Map(); // tabId -> account ID seen on the current page of that tab
+  let run = null;
+  let starting = null;
+  let writes = Promise.resolve(); // analytics writes, separate from the Library queue
+
+  // Last capture per operation, for development diagnostics: field names and
+  // types, page path and outcome. Never values, so it is safe to download.
+  let diagnostics = {};
+  let seenOps = [];
+  let restored = false;
+
+  // Paths are reduced to known page prefixes with IDs replaced, so a report
+  // never names a post or an account.
+  function cleanPath(url) {
+    let path = '';
+    try {
+      path = new URL(url).pathname;
+    } catch {
+      return '';
+    }
+    return isDiagnosticPath(path) ? path.replace(/\d{3,}/g, ':id').slice(0, 80) : '(other page)';
+  }
+
+  // After a worker restart, merge what session storage kept before writing.
+  async function restoreDiagnostics() {
+    if (restored) return;
+    restored = true;
+    try {
+      const saved = await session?.get([DIAGNOSTICS_KEY, `${DIAGNOSTICS_KEY}Seen`]);
+      diagnostics = { ...saved?.[DIAGNOSTICS_KEY], ...diagnostics };
+      seenOps = [...(saved?.[`${DIAGNOSTICS_KEY}Seen`] || []), ...seenOps].slice(-80);
+    } catch {
+      // Use the in-memory copy.
+    }
+  }
+
+  async function note(operation, sender, outcome, body) {
+    if (!diagnosticsEnabled) return;
+    await restoreDiagnostics();
+    const path = cleanPath(sender.url);
+    diagnostics = {
+      ...diagnostics,
+      [operation]: { at: new Date(now()).toISOString(), path, ...outcome, shape: body === undefined ? null : responseShape(body) }
+    };
+    try {
+      await session?.set({ [DIAGNOSTICS_KEY]: diagnostics });
+    } catch {
+      // Session storage unavailable; the in-memory copy remains.
+    }
+  }
+
+  function enqueue(fn) {
+    const work = writes.then(fn);
+    writes = work.catch(() => {});
+    return work;
+  }
+
+  const read = async (key) => (await storage.get(key))[key];
+  const readPrefs = async () => ({ autoSync: false, ...(await read(ANALYTICS_KEYS.prefs)) });
+  const readSync = async () => (await read(ANALYTICS_KEYS.sync)) || {};
+  const writeSync = (value) => storage.set({ [ANALYTICS_KEYS.sync]: value });
+
+  async function load() {
+    await recover();
+    const [data, prefs, sync] = await Promise.all([read(ANALYTICS_KEYS.data), readPrefs(), readSync()]);
+    return { data: readAnalytics(data), prefs, sync: { ...sync, running: Boolean(run) } };
+  }
+
+  async function store(operation, body, tabId) {
+    const parsed = parseCapture(operation, body);
+    await enqueue(async () => {
+      const state = readAnalytics(await read(ANALYTICS_KEYS.data));
+      // Mentions and post details carry no account ID. A post detail belongs
+      // to the account that has the post; otherwise use the account seen in
+      // this tab or the account of the sync running in it. Never guess.
+      const owner = POST_DETAIL_OPERATIONS.has(parsed.operation)
+        ? Object.values(state.accounts).find((account) => account.posts?.[parsed.postId])?.id
+        : '';
+      const hint = owner || tabAccounts.get(tabId) || (run && tabId === run.tabId ? run.accountId : '') || '';
+      const next = applyCapture(state, parsed, { now: now(), accountHint: hint });
+      try {
+        await storage.set({ [ANALYTICS_KEYS.data]: next });
+      } catch {
+        throw new Error('Could not save analytics locally. Storage may be full.');
+      }
+    });
+    if (parsed.accountId && tabId !== undefined) tabAccounts.set(tabId, parsed.accountId);
+    return parsed;
+  }
+
+  const recordCounts = (parsed) =>
+    Object.fromEntries(
+      ['days', 'hours', 'heatmap', 'posts', 'mentions']
+        .filter((key) => parsed[key] !== undefined)
+        .map((key) => [key, Array.isArray(parsed[key]) ? parsed[key].length : Object.keys(parsed[key]).length])
+        .concat(parsed.rowCount === undefined ? [] : [['rows', parsed.rowCount]])
+        .concat(parsed.dropped ? [['dropped', parsed.dropped]] : [])
+        .concat(parsed.posts?.length ? [['postDays', postDays(parsed.posts)]] : [])
+    );
+  const postDays = (posts) => {
+    const days = posts.map((post) => new Date(post.createdAt).toISOString().slice(0, 10)).sort();
+    return [days[0], days.at(-1)];
+  };
+
+  async function finish(error) {
+    if (!run) return;
+    const done = run;
+    run = null;
+    clearTimeout(done.timer);
+    clearTimeout(done.settle);
+    tabs.remove(done.tabId).catch(() => {});
+    tabAccounts.delete(done.tabId);
+    const previous = await readSync();
+    await writeSync({
+      running: false,
+      trigger: done.trigger,
+      lastAttemptAt: new Date(done.startedAt).toISOString(),
+      // Data deleted during the run: the next sync must backfill again.
+      lastSuccessAt: done.cleared ? null : error ? previous.lastSuccessAt || null : new Date(done.startedAt).toISOString(),
+      ok: !error,
+      error: error || null,
+      steps: done.steps.map((step, i) => ({
+        id: step.id,
+        ok: !done.missed?.includes(step.id) && (i < done.index || (!error && i === done.index))
+      }))
+    });
+  }
+
+  function armTimer() {
+    clearTimeout(run.timer);
+    const step = run.steps[run.index];
+    run.timer = setTimeout(() => {
+      if (!step.optional) {
+        finish(`X did not load the ${step.id.replace('-', ' ')} page in time. Try again, or open X Analytics once to check you are signed in.`);
+        return;
+      }
+      run.missed = [...(run.missed || []), step.id];
+      advance();
+    }, stepTimeoutMs);
+  }
+
+  async function advance() {
+    if (!run) return;
+    run.index++;
+    if (run.index >= run.steps.length) return finish(null);
+    armTimer();
+    try {
+      await tabs.update(run.tabId, { url: run.steps[run.index].url });
+    } catch {
+      await finish('The sync tab was closed.');
+    }
+  }
+
+  function onCapture(tabId, operation, parsed) {
+    if (!run || tabId !== run.tabId || run.settle) return;
+    const step = run.steps[run.index];
+    if (operation !== step.expect && !step.alsoExpect?.includes(operation)) return;
+    if (parsed.accountId) run.accountId = parsed.accountId;
+    if (operation === OPERATIONS.content && parsed.rowCount >= CONTENT_PAGE_LIMIT && run.steps.length < MAX_STEPS) {
+      const oldest = Math.min(...parsed.posts.map((post) => post.createdAt));
+      const older = olderContentStep(step.range, oldest, run.steps.filter((s) => s.id.startsWith('content-older')).length + 1);
+      if (older) run.steps.splice(run.index + 1, 0, older);
+    }
+    clearTimeout(run.timer);
+    run.settle = setTimeout(() => {
+      if (!run) return;
+      run.settle = null;
+      advance();
+    }, settleMs);
+  }
+
+  async function startSync(trigger) {
+    if (run) return { running: true };
+    if (starting) return starting;
+    starting = (async () => {
+      const sync = await readSync();
+      // Without stored posts (first sync, or data deleted) backfill 12 weeks.
+      const data = readAnalytics(await read(ANALYTICS_KEYS.data));
+      const hasPosts = Object.values(data.accounts).some((account) => Object.keys(account.posts || {}).length);
+      const steps = syncSteps(hasPosts ? sync.lastSuccessAt : null, now());
+      const tab = await tabs.create({ url: steps[0].url, active: false });
+      run = { trigger, tabId: tab.id, steps, index: 0, startedAt: now(), timer: null, settle: null };
+      // Recorded now, so a run lost with the worker still counts toward the daily limit.
+      await writeSync({
+        ...sync,
+        running: true,
+        tabId: tab.id,
+        lastAttemptAt: new Date(run.startedAt).toISOString()
+      });
+      armTimer();
+      return { running: true };
+    })();
+    try {
+      return await starting;
+    } finally {
+      starting = null;
+    }
+  }
+
+  // A stored running flag without a run in memory means the browser stopped
+  // the worker mid-sync: close the leftover tab and report it.
+  async function recover() {
+    if (run || starting) return;
+    const sync = await readSync();
+    if (!sync.running) return;
+    if (Number.isInteger(sync.tabId)) tabs.remove(sync.tabId).catch(() => {});
+    await writeSync({ ...sync, running: false, ok: false, error: 'The last sync was interrupted. Try again.' });
+  }
+
+  tabs.onUpdated?.addListener((tabId, change) => {
+    if (!change.url) return;
+    tabAccounts.delete(tabId); // a new page may belong to another account
+    if (run && tabId === run.tabId && isPremiumRedirect(change.url)) {
+      finish('X Analytics needs X Premium and a signed-in account in this browser.');
+    }
+  });
+  tabs.onRemoved?.addListener((tabId) => {
+    tabAccounts.delete(tabId);
+    if (run && tabId === run.tabId) {
+      run.tabId = -1;
+      finish('The sync tab was closed before it finished.');
+    }
+  });
+
+  // Operation names seen on analytics and notifications pages (no content).
+  async function recordSeen(payload, sender) {
+    if (!diagnosticsEnabled) return {};
+    const path = cleanPath(sender.url);
+    if (!path || path === '(other page)') return {};
+    await restoreDiagnostics();
+    const entry = {
+      at: new Date(now()).toISOString(),
+      path,
+      operation: String(payload.operation).slice(0, 80),
+      status: Number(payload.status) || 0,
+      contentType: String(payload.contentType || '').slice(0, 80),
+      read: String(payload.read || '').slice(0, 20)
+    };
+    seenOps = [...seenOps, entry].slice(-80);
+    try {
+      await session?.set({ [`${DIAGNOSTICS_KEY}Seen`]: seenOps });
+    } catch {
+      // In-memory copy remains.
+    }
+    return {};
+  }
+
+  async function readDiagnostics() {
+    await restoreDiagnostics();
+    const { data, sync } = await load();
+    return {
+      generatedAt: new Date(now()).toISOString(),
+      captures: diagnostics,
+      seen: seenOps,
+      sync,
+      accounts: Object.values(data.accounts).map(accountSummary)
+    };
+  }
+
+  const MAX_CSV_CHARS = 10 * 1024 * 1024;
+
+  // Fallback import of X's own CSV exports into the same store.
+  async function importCsv(payload) {
+    const text = String(payload.text || '');
+    if (!text || text.length > MAX_CSV_CHARS) throw new Error('Choose an X Analytics CSV under 10 MB.');
+    const csv = parseAnalyticsCsv(text);
+    let counts = {};
+    await enqueue(async () => {
+      const state = readAnalytics(await read(ANALYTICS_KEYS.data));
+      const accounts = Object.values(state.accounts);
+      const byHandle = csv.profile?.handle && accounts.find((a) => a.handle?.toLowerCase() === csv.profile.handle.toLowerCase());
+      if (csv.profile?.handle && !byHandle)
+        throw new Error(`This file is for @${csv.profile.handle}. Sync that account from X first, then import it.`);
+      const chosen = byHandle?.id || (state.accounts[payload.accountId] ? payload.accountId : '') || (accounts.length === 1 ? accounts[0].id : '');
+      if (!chosen) throw new Error('Sync from X once first, so XTOC knows which account this file belongs to.');
+      const parsed =
+        csv.kind === 'content'
+          ? { operation: OPERATIONS.content, accountId: chosen, posts: csv.posts, profile: byHandle ? csv.profile : {} }
+          : { operation: OPERATIONS.overviewDaily, accountId: chosen, days: csv.days };
+      counts = csv.kind === 'content' ? { posts: csv.posts.length } : { days: Object.keys(csv.days).length };
+      await storage.set({ [ANALYTICS_KEYS.data]: applyCapture(state, parsed, { now: now(), source: 'csv' }) });
+    });
+    return { kind: csv.kind, ...counts };
+  }
+
+  return {
+    load,
+    recover,
+    importCsv,
+    diagnostics: readDiagnostics,
+    seen: recordSeen,
+    async capture(payload, sender) {
+      const tabId = sender.tab?.id;
+      if (!KNOWN.has(payload.operation)) throw new Error('Unsupported analytics operation.');
+      // Page scripts can post messages on any x.com page; only analytics pages count.
+      if (!isCapturePage(sender.url, payload.operation) && !(run && tabId === run.tabId)) {
+        await note(payload.operation, sender, { accepted: false }, payload.body);
+        return { stored: false };
+      }
+      await recover();
+      let parsed;
+      try {
+        parsed = await store(payload.operation, payload.body, tabId);
+      } catch (error) {
+        await note(payload.operation, sender, { accepted: true, error: error.message }, payload.body);
+        throw error;
+      }
+      await note(payload.operation, sender, { accepted: true, error: null, records: recordCounts(parsed) }, payload.body);
+      onCapture(tabId, payload.operation, parsed);
+      return { stored: true };
+    },
+    async visit() {
+      await recover();
+      if (run || starting) return { started: false };
+      const [prefs, sync] = await Promise.all([readPrefs(), readSync()]);
+      if (!autoSyncDue({ autoSync: prefs.autoSync, lastAttemptAt: sync.lastAttemptAt }, now())) return { started: false };
+      await startSync('auto');
+      return { started: true };
+    },
+    sync: () => startSync('manual'),
+    async setPrefs(payload) {
+      const prefs = { ...(await readPrefs()), autoSync: payload.autoSync === true };
+      await storage.set({ [ANALYTICS_KEYS.prefs]: prefs });
+      return prefs;
+    },
+    async clear(payload) {
+      if (run) run.cleared = true;
+      await enqueue(async () => {
+        const state = readAnalytics(await read(ANALYTICS_KEYS.data));
+        if (!payload.accountId) return storage.set({ [ANALYTICS_KEYS.data]: emptyAnalytics() });
+        const { [payload.accountId]: _removed, ...accounts } = state.accounts;
+        return storage.set({ [ANALYTICS_KEYS.data]: { ...state, accounts } });
+      });
+      // Without stored posts the next sync must backfill, not read only new days.
+      await writeSync({ ...(await readSync()), lastSuccessAt: null });
+      return load();
+    }
+  };
+}

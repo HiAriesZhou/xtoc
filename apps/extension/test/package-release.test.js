@@ -41,3 +41,20 @@ test('manifest checks catch wrong versions, wrong manifest versions and dev bran
     /dev icons/
   );
 });
+
+test('manifestProblems reports scripts the manifest names but the build lacks', () => {
+  const chrome = TARGETS.find((t) => t.id === 'chrome');
+  const manifest = {
+    version: '0.9.0',
+    manifest_version: chrome.manifestVersion,
+    name: 'XTOC',
+    background: { service_worker: 'background/service_worker.js' },
+    content_scripts: [{ js: ['content_scripts/content-0.js', 'content_scripts/content-2.js'], css: ['content_scripts/content-1.css'] }]
+  };
+  const built = new Set(['background/service_worker.js', 'content_scripts/content-0.js', 'content_scripts/content-1.css']);
+  assert.match(
+    manifestProblems(manifest, chrome, '0.9.0', (file) => built.has(file)).join(),
+    /missing files: content_scripts\/content-2\.js/
+  );
+  assert.deepEqual(manifestProblems(manifest, chrome, '0.9.0', () => true), []);
+});
