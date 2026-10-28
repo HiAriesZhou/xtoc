@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   audienceGrid,
   breakdown,
+  heatmapMetric,
   dayRange,
   derived,
   funnel,
@@ -212,4 +213,18 @@ test('inboundLedger shows who engages with you and whether you replied', () => {
   ]);
   const ledger = interactionLedger({ handle: 'me', inbound, posts }, { days: 30, today });
   assert.equal(ledger[0].inbound, 1);
+});
+
+test('audienceGrid falls back to the metric X returned (the heatmap defaults to Likes)', () => {
+  const grid = audienceGrid({ '2026-10-26T09': { Likes: 4 } }, undefined, utcParts);
+  assert.deepEqual(grid[1][9], { count: 1, value: 4 });
+  assert.equal(heatmapMetric({ a: { Likes: 1 } }), 'Likes');
+  assert.equal(heatmapMetric({ a: { Likes: 1, Impressions: 3 } }), 'Impressions');
+  assert.equal(heatmapMetric({}), null);
+});
+
+test('summary reports how many days of the period have data', () => {
+  const daily = dailyFor(7, () => ({ Impressions: 10 }));
+  const s = summary({ daily }, { days: 28, today });
+  assert.equal(s.coverage, 7);
 });

@@ -148,7 +148,8 @@ export function digest(account, { days = 7, today = Date.now() } = {}) {
   const lines = [];
   const [impressions, engagement, net, visits] = s.kpis;
   if (impressions.value !== null) {
-    lines.push(`Impressions: ${fmt(impressions.value)}${changeText(impressions.change)}.`);
+    const partial = s.coverage < days ? ` over ${s.coverage} of ${days} days with data` : '';
+    lines.push(`Impressions: ${fmt(impressions.value)}${partial}${changeText(impressions.change)}.`);
     lines.push(`Engagement rate: ${pct(engagement.value)}; profile visits: ${fmt(visits.value)}; net follows: ${signed(net.value)}.`);
     const conversion = s.derived.followConversion;
     if (conversion !== null) lines.push(`${pct(conversion)} of profile visits turned into follows.`);

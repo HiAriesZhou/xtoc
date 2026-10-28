@@ -80,3 +80,11 @@ test('mentions are stored as inbound interactions, skipping the account itself',
   state = apply(state, 'notificationsQuery', mentions(), { now: day0 });
   assert.deepEqual(Object.keys(state.accounts[ACCOUNT_ID].inbound).sort(), ['501', '502']);
 });
+
+test('audience captures merge by dimension instead of replacing each other', () => {
+  const first = { operation: 'audienceOverviewDataQuery', accountId: '1', audience: { age: { A: { Impressions: 1 } }, network: {} }, heatmap: {} };
+  const second = { operation: 'audienceOverviewDataQuery', accountId: '1', audience: { age: {}, network: { inNetwork: { Impressions: 2 } } }, heatmap: {} };
+  const state = applyCapture(applyCapture(emptyAnalytics(), first, { now: day0 }), second, { now: day0 + 1 });
+  assert.deepEqual(state.accounts['1'].audience.age, { A: { Impressions: 1 } });
+  assert.deepEqual(state.accounts['1'].audience.network, { inNetwork: { Impressions: 2 } });
+});

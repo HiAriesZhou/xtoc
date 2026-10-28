@@ -72,6 +72,7 @@ export function summary(account, { days = 28, today = Date.now() } = {}) {
   const pd = derived(previous);
   return {
     days,
+    coverage: current.days, // days of the period that have data
     current,
     previous,
     derived: cd,
@@ -243,7 +244,15 @@ export function postingGrid(posts, parts = localParts) {
 
 // Weekday × hour of when the audience saw the author's content (X's hourly
 // heatmap, or the hourly overview). Averaged per occurrence of each slot.
-export function audienceGrid(hourly = {}, metric = 'Impressions', parts = localParts) {
+// X's audience heatmap returns only the metric selected on its page (Likes
+// by default), so use Impressions when present and otherwise what X sent.
+export function heatmapMetric(hourly = {}) {
+  const names = new Set(Object.values(hourly).flatMap((values) => Object.keys(values || {})));
+  if (names.has('Impressions')) return 'Impressions';
+  return [...names].sort()[0] || null;
+}
+
+export function audienceGrid(hourly = {}, metric = heatmapMetric(hourly), parts = localParts) {
   const grid = emptyGrid();
   for (const [key, values] of Object.entries(hourly)) {
     const ms = Date.parse(`${key}:00:00Z`);

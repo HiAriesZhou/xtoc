@@ -120,7 +120,13 @@ function applyToAccount(account, parsed, now) {
       next.hourly = keepRecent(mergeBuckets(account.hourly, parsed.hours), HOURLY_KEEP_DAYS, now, hourMs);
       break;
     case OPERATIONS.audience:
-      next.audience = { ...parsed.audience, capturedAt: now };
+      // X's audience page can send several queries with different dimensions;
+      // keep each dimension from the latest capture that has data for it.
+      next.audience = {
+        ...account.audience,
+        ...Object.fromEntries(Object.entries(parsed.audience).filter(([, groups]) => Object.keys(groups || {}).length)),
+        capturedAt: now
+      };
       next.heatmap = keepRecent(mergeBuckets(account.heatmap, parsed.heatmap), HEATMAP_KEEP_DAYS, now, hourMs);
       break;
     case OPERATIONS.content:

@@ -9,6 +9,7 @@ import { attachChartHover } from './analytics-charts.js';
 import {
   aiCard,
   audienceCard,
+  coverageNote,
   breakdownCard,
   cadenceCard,
   digestCard,
@@ -111,6 +112,7 @@ export function createAnalyticsView(ctx) {
       ${header(accounts)}
       <div class="a-page">
         ${digestCard(digest(account, { days: view.days, today }))}
+        ${coverageNote(s)}
         ${kpiTiles(s)}
         ${trendCards(s)}
         ${funnelCard(s.current, s.derived)}

@@ -1,6 +1,6 @@
 // Section renderers for the Analytics page. Each takes computed results from
 // src/analytics and returns HTML; every dynamic value is escaped.
-import { audienceGrid, breakdown, funnel, postingGrid, topSlots } from '../analytics/metrics.js';
+import { audienceGrid, breakdown, funnel, heatmapMetric, postingGrid, topSlots } from '../analytics/metrics.js';
 import { growthCurve, halfLife, medianHalfLife } from '../analytics/insights.js';
 import {
   barList,
@@ -47,6 +47,11 @@ function deltaBadge(kpi) {
   const tone = Math.abs(kpi.change) < 0.005 ? '' : up ? 'is-up' : 'is-down';
   const arrow = Math.abs(kpi.change) < 0.005 ? '→' : up ? '↑' : '↓';
   return `<span class="a-delta ${tone}">${arrow} ${esc(format(Math.abs(kpi.change), 'percent'))} <span class="subtle">vs previous</span></span>`;
+}
+
+export function coverageNote(summary) {
+  if (!summary.coverage || summary.coverage >= summary.days) return '';
+  return `<p class="hint a-coverage">${esc(`Daily totals cover ${summary.coverage} of ${summary.days} days so far. X's overview sends its last 7 days by default; each sync adds days, and choosing a longer range once on X Analytics fills in more.`)}</p>`;
 }
 
 export function kpiTiles(summary) {
@@ -152,18 +157,22 @@ export function postsCard(account, posts, { sort, kind, limit }) {
   );
 }
 
+const METRIC_UNITS = { Impressions: 'impressions', Likes: 'likes', Engagements: 'engagements', Replies: 'replies', Reposts: 'reposts', Bookmarks: 'bookmarks', Shares: 'shares', ProfileVisits: 'profile visits', Follows: 'follows' };
+
 const slotText = (slot) => `${DAY_NAMES[slot.day]} ${hourLabel(slot.hour)}`;
 
 export function timingCard(account, posts) {
   const originals = posts.filter((p) => p.kind !== 'reply');
   const postGrid = postingGrid(originals);
   const audienceSource = Object.keys(account.heatmap || {}).length ? account.heatmap : account.hourly || {};
-  const seenGrid = audienceGrid(audienceSource, 'Impressions');
+  const metric = heatmapMetric(audienceSource);
+  const unit = (METRIC_UNITS[metric] || metric || 'activity').toLowerCase();
+  const seenGrid = audienceGrid(audienceSource, metric);
   const bestPosts = topSlots(postGrid, { minCount: 2 });
   const bestAudience = topSlots(seenGrid, { limit: 3 });
   const busiestPosting = topSlots(postGrid.map((row) => row.map((cell) => ({ ...cell, value: cell.count || null }))), { limit: 1 })[0];
   const insight = [];
-  if (bestAudience.length) insight.push(`Your audience saw the most of your content around ${bestAudience.map(slotText).join(', ')}.`);
+  if (bestAudience.length) insight.push(`Your audience was most active (${unit}) around ${bestAudience.map(slotText).join(', ')}.`);
   if (busiestPosting) insight.push(`You post most often on ${slotText(busiestPosting)}.`);
   if (bestPosts.length) insight.push(`Posts published around ${slotText(bestPosts[0])} did best (median ${format(bestPosts[0].value, 'compact')} impressions).`);
   return card(
@@ -171,9 +180,9 @@ export function timingCard(account, posts) {
     `${insight.length ? `<p>${esc(insight.join(' '))}</p>` : ''}
      <div class="a-split">
        <div><h3>Your posts, median impressions</h3>${heatmap(postGrid, { label: 'Post performance', unit: 'impressions' })}</div>
-       <div><h3>Audience activity, impressions per hour</h3>${heatmap(seenGrid, { label: 'Audience activity', unit: 'impressions' })}</div>
+       <div><h3>${esc(`Audience activity, ${unit} per hour`)}</h3>${heatmap(seenGrid, { label: 'Audience activity', unit })}</div>
      </div>`,
-    { sub: 'Local time. Audience activity comes from X’s hourly data for recent weeks.' }
+    { sub: 'Local time. Audience activity comes from X’s hourly data for the last four weeks, for the metric selected on X’s Audience page (Likes by default).' }
   );
 }
 
