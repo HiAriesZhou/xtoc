@@ -228,3 +228,9 @@ test('summary reports how many days of the period have data', () => {
   const s = summary({ daily }, { days: 28, today });
   assert.equal(s.coverage, 7);
 });
+
+test('heatmapMetric takes the metric present in most hours', () => {
+  const hourly = { a: { Likes: 1 }, b: { Likes: 2 }, c: { Likes: 3, Impressions: 9 } };
+  assert.equal(heatmapMetric(hourly), 'Likes');
+  assert.equal(heatmapMetric({ a: { Likes: 1, Impressions: 2 } }), 'Impressions');
+});

@@ -247,10 +247,13 @@ export function postingGrid(posts, parts = localParts) {
 // heatmap, or the hourly overview). Averaged per occurrence of each slot.
 // X's audience heatmap returns only the metric selected on its page (Likes
 // by default), so use Impressions when present and otherwise what X sent.
+// Hours kept from an earlier capture can carry another metric, so take the
+// metric present in the most hours (Impressions wins a tie).
 export function heatmapMetric(hourly = {}) {
-  const names = new Set(Object.values(hourly).flatMap((values) => Object.keys(values || {})));
-  if (names.has('Impressions')) return 'Impressions';
-  return [...names].sort()[0] || null;
+  const counts = {};
+  for (const values of Object.values(hourly)) for (const name of Object.keys(values || {})) counts[name] = (counts[name] || 0) + 1;
+  const names = Object.keys(counts).sort((a, b) => counts[b] - counts[a] || (b === 'Impressions') - (a === 'Impressions') || a.localeCompare(b));
+  return names[0] || null;
 }
 
 export function audienceGrid(hourly = {}, metric = heatmapMetric(hourly), parts = localParts) {
