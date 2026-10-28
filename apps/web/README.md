@@ -34,7 +34,7 @@ Public-facing claims should stay aligned with the released extension:
 - Store saved clips locally with `chrome.storage.local`.
 - Do not send saved clips to an external server.
 
-- Privacy policy: [x-toc.vercel.app/privacy](https://x-toc.vercel.app/privacy)
+- Privacy policy: [xtoc.arieszhou.com/privacy](https://xtoc.arieszhou.com/privacy)
 
 ## Development
 
