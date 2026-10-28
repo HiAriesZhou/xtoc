@@ -320,6 +320,8 @@ export function createAnalyticsService({
         const { [payload.accountId]: _removed, ...accounts } = state.accounts;
         return storage.set({ [ANALYTICS_KEYS.data]: { ...state, accounts } });
       });
+      // Without stored posts the next sync must backfill, not read only new days.
+      await writeSync({ ...(await readSync()), lastSuccessAt: null });
       return load();
     }
   };

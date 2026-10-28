@@ -224,3 +224,12 @@ test('the first sync reads 12 weeks of content in three windows', async () => {
     '/i/account_analytics/audience'
   ]);
 });
+
+test('deleting analytics data makes the next sync backfill again', async () => {
+  const { service, data } = harness();
+  data.xtocAnalyticsSync = { lastSuccessAt: '2026-10-26T11:00:00.000Z', lastAttemptAt: '2026-10-26T11:00:00.000Z', ok: true };
+  await service.clear({});
+  assert.equal(data.xtocAnalyticsSync.lastSuccessAt, null);
+  const { sync } = await service.load();
+  assert.equal(sync.lastSuccessAt, null);
+});
