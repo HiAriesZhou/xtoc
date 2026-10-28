@@ -142,3 +142,38 @@ export function mentions() {
     }
   });
 }
+
+// Per-post analytics page responses (tweet_result_by_rest_id, no viewer block).
+export function postSeries(id, startMs, hours = 3) {
+  return {
+    data: {
+      tweet_result_by_rest_id: {
+        rest_id: id,
+        result: {
+          __typename: 'Tweet',
+          rest_id: id,
+          organic_metrics_time_series: Array.from({ length: hours }, (_, i) => ({
+            timestamp: { iso8601_time: new Date(startMs + i * 3600000).toISOString() },
+            metric_values: [{ metric_type: 'Impressions', metric_value: 10 * (i + 1) }, { metric_type: 'Likes', metric_value: i }]
+          }))
+        }
+      }
+    }
+  };
+}
+
+export function postAudience(id) {
+  return {
+    data: {
+      tweet_result_by_rest_id: {
+        rest_id: id,
+        result: {
+          __typename: 'Tweet',
+          rest_id: id,
+          uec_metrics_daily_time_series_count: [{ engagement_type: 'Displayed', count: 30, age: 'Age25to34', timestamp: '0' }],
+          uec_country_metrics_daily_time_series_count: [{ country: 'JP', engagement_type: 'Displayed', count: 12, timestamp: '0' }]
+        }
+      }
+    }
+  };
+}

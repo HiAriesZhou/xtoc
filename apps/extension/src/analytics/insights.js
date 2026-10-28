@@ -226,3 +226,11 @@ export function interpretationInput(account, { days = 28, today = Date.now() } =
     followConversion: round(rate(s.current.Follows || 0, s.current.ProfileVisits || 0))
   };
 }
+
+// Hourly points of one post's series (from its X analytics page), oldest first.
+export function postDetailSeries(series = {}, metric = 'Impressions') {
+  return Object.entries(series)
+    .map(([hour, values]) => ({ hour, at: Date.parse(`${hour}:00:00Z`), value: values?.[metric] ?? null }))
+    .filter((point) => Number.isFinite(point.at) && point.value !== null)
+    .sort((a, b) => a.at - b.at);
+}

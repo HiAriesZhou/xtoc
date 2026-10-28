@@ -1,7 +1,7 @@
 // Section renderers for the Analytics page. Each takes computed results from
 // src/analytics and returns HTML; every dynamic value is escaped.
 import { audienceGrid, breakdown, funnel, heatmapMetric, postingGrid, topSlots } from '../analytics/metrics.js';
-import { growthCurve, halfLife, medianHalfLife } from '../analytics/insights.js';
+import { growthCurve, halfLife, medianHalfLife, postDetailSeries } from '../analytics/insights.js';
 import {
   barList,
   columns,
@@ -316,7 +316,33 @@ export function aiCard(aiState, configured) {
   return card('AI reading', `${result}<p class="hint">Optional. Sends only this period’s aggregate numbers to your AI provider: no post text, handles or notes.</p>`, { actions: button });
 }
 
-export function postDrawer(account, post) {
+function postDetailBlock(account, post, detail) {
+  const link = `<a class="source" href="https://x.com/i/account_analytics/content/${encodeURIComponent(post.id)}" target="_blank" rel="noopener noreferrer">${esc(detail ? 'Refresh from this post’s X analytics' : 'Open this post’s X analytics to add hourly detail')} ${icon('external', 13)}</a>`;
+  if (!detail) return link;
+  const points = postDetailSeries(detail.first48, 'Impressions');
+  const parts = [];
+  if (points.length) {
+    const total = points.reduce((sum, p) => sum + p.value, 0);
+    const peak = points.reduce((best, p) => (p.value > best.value ? p : best), points[0]);
+    let running = 0;
+    const half = points.find((p) => (running += p.value) >= total / 2);
+    const hoursAfter = (p) => Math.max(0, Math.round((p.at - post.createdAt) / 3600000));
+    parts.push(`<div><h3>First 48 hours</h3>${sparkline(points.map((p) => p.value), { width: 320, height: 48 })}
+      <p class="subtle">${esc(`${format(total)} impressions in the first 48 hours; the busiest hour was ${hoursAfter(peak)} h after posting (${format(peak.value)}), and half arrived within ${hoursAfter(half)} h.`)}</p></div>`);
+  }
+  const audience = detail.audience || {};
+  const rows = (map, labelOf) =>
+    Object.entries(map || {})
+      .map(([key, values]) => ({ label: labelOf(key), value: values.Impressions || 0 }))
+      .filter((row) => row.value > 0)
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 5);
+  const countries = rows(audience.country, (code) => regionNames?.of(code) || code);
+  if (countries.length) parts.push(`<div><h3>Who saw it</h3>${barList(countries, { kind: 'compact', valueLabel: 'impressions' })}</div>`);
+  return parts.join('') + link;
+}
+
+export function postDrawer(account, post, detail = null) {
   const m = post.metrics || {};
   const curve = growthCurve(post);
   const life = halfLife(post);
@@ -351,6 +377,7 @@ export function postDrawer(account, post) {
       ${post.multiple !== null && post.multiple !== undefined ? `<p>${esc(`${format(post.multiple, 'multiple')} the impressions of your usual ${post.kind === 'reply' ? 'reply' : 'post'}.`)}</p>` : ''}
       <dl class="a-stats">${stats.map(([label, value]) => `<div><dt>${esc(label)}</dt><dd>${esc(value)}</dd></div>`).join('')}</dl>
       ${growth}
+      ${postDetailBlock(account, post, detail)}
     </div>`;
 }
 

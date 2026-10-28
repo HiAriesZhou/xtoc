@@ -11,8 +11,14 @@ export const OPERATIONS = {
   // the Mentions page. A live check showed that page loads NotificationsTimeline;
   // notificationsQuery is the newer client's name for the same timeline.
   mentions: 'NotificationsTimeline',
-  mentionsRelay: 'notificationsQuery'
+  mentionsRelay: 'notificationsQuery',
+  // A post's own analytics page (x.com/i/account_analytics/content/<id>).
+  postFirst48: 'postDetailsProviderFirst48HoursDataQuery',
+  postLast48: 'postDetailsProviderLast48HoursOrganicDataQuery',
+  postAudience: 'postDetailsProviderAudienceQuery'
 };
+
+export const POST_DETAIL_OPERATIONS = new Set([OPERATIONS.postFirst48, OPERATIONS.postLast48, OPERATIONS.postAudience]);
 
 export const MENTION_OPERATIONS = new Set([OPERATIONS.mentions, OPERATIONS.mentionsRelay]);
 

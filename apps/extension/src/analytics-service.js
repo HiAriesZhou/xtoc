@@ -8,6 +8,7 @@ import {
   isPremiumRedirect,
   olderContentStep,
   OPERATIONS,
+  POST_DETAIL_OPERATIONS,
   syncSteps
 } from './analytics/operations.js';
 import { parseCapture } from './analytics/parse.js';
@@ -83,7 +84,9 @@ export function createAnalyticsService({
       const only = Object.keys(state.accounts).length === 1 ? Object.keys(state.accounts)[0] : '';
       const hint =
         tabAccounts.get(tabId) ||
-        (parsed.operation === OPERATIONS.mentions ? (run && tabId === run.tabId && run.accountId) || only : '');
+        (parsed.operation === OPERATIONS.mentions || POST_DETAIL_OPERATIONS.has(parsed.operation)
+          ? (run && tabId === run.tabId && run.accountId) || only
+          : '');
       const next = applyCapture(state, parsed, { now: now(), accountHint: hint });
       try {
         await storage.set({ [ANALYTICS_KEYS.data]: next });

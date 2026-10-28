@@ -171,7 +171,7 @@ export function createAnalyticsView(ctx) {
     }
     if (target.dataset.post && account) {
       const post = postList(account, { days: 3650 }).find((p) => p.id === target.dataset.post);
-      if (post) ctx.openDrawer(postDrawer(account, post));
+      if (post) ctx.openDrawer(postDrawer(account, post, account.postDetails?.[post.id] || null));
       return;
     }
     const action = target.dataset.action;

@@ -1,7 +1,7 @@
 // Turns X analytics GraphQL responses into small, typed records. The shapes
 // follow the Relay queries in X's web client (see operations.js); every field is
 // optional here, because X can change them and a partial capture is still useful.
-import { MENTION_OPERATIONS, OPERATIONS } from './operations.js';
+import { MENTION_OPERATIONS, OPERATIONS, POST_DETAIL_OPERATIONS } from './operations.js';
 
 // XTOC metric names, shared by days, hours and posts.
 export const METRICS = [
@@ -345,7 +345,24 @@ const PARSERS = {
 
 // Returns { operation, accountId, ...parsed } or throws when the response is
 // not something XTOC understands (X changed the page, or an error response).
+// A single post's analytics page: hourly series or audience for that post.
+function parsePostDetail(operation, body) {
+  const item = body?.data?.tweet_result_by_rest_id;
+  const tweet = unwrapTweet(item?.result);
+  const postId = str(tweet?.rest_id || item?.rest_id, 25);
+  if (!tweet || !/^\d+$/.test(postId)) throw new Error('X returned no post analytics.');
+  if (operation === OPERATIONS.postAudience) {
+    const totals = dimensionTotals(tweet.uec_metrics_daily_time_series_count, AUDIENCE_DIMENSIONS);
+    const { country } = dimensionTotals(tweet.uec_country_metrics_daily_time_series_count, {
+      country: (row) => (row.country && row.country !== 'Other' && !RESERVED.has(row.country) ? str(row.country, 60) : '')
+    });
+    return { operation, accountId: '', postId, audience: { ...totals, country } };
+  }
+  return { operation, accountId: '', postId, series: organicSeries(tweet.organic_metrics_time_series, hourKey) };
+}
+
 export function parseCapture(operation, body) {
+  if (POST_DETAIL_OPERATIONS.has(operation)) return parsePostDetail(operation, body);
   if (MENTION_OPERATIONS.has(operation)) {
     // The legacy timeline has no viewer block; the account comes from the tab.
     if (!body?.data || typeof body.data !== 'object') throw new Error('X returned no mentions data.');

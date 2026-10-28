@@ -170,6 +170,8 @@ export interface XtocAnalyticsAccount {
   posts?: Record<string, XtocAnalyticsPost>;
   /** Others' replies and mentions from the Mentions timeline, keyed by tweet ID; no text. */
   inbound?: Record<string, { id: string; handle: string; createdAt: number; kind: 'reply' | 'mention' }>;
+  /** From a post's own X analytics page, keyed by post ID; at most 200 posts. */
+  postDetails?: Record<string, { first48?: Record<string, XtocAnalyticsMetrics>; last48?: Record<string, XtocAnalyticsMetrics>; audience?: Record<string, Record<string, XtocAnalyticsMetrics>>; capturedAt: number }>;
 }
 
 /** chrome.storage.local `xtocAnalytics`. Never exported with clips. */

@@ -16,6 +16,7 @@ const HEATMAP_KEEP_DAYS = 35;
 const MAX_SNAPSHOTS = 40;
 const MAX_ACCOUNTS = 10;
 const MAX_INBOUND = 3000;
+const MAX_POST_DETAILS = 200;
 const MAX_POSTS_PER_ACCOUNT = 10000;
 const DAY_MS = 86400000;
 const RESERVED = ['__proto__', 'constructor', 'prototype'];
@@ -97,6 +98,18 @@ function mergeInbound(current = {}, mentions, ownHandle) {
   return Object.fromEntries(list.sort((a, b) => b.createdAt - a.createdAt).slice(0, MAX_INBOUND).map((item) => [item.id, item]));
 }
 
+// Per-post details from a post's analytics page; the most recent 200 posts kept.
+const DETAIL_FIELD = { postDetailsProviderFirst48HoursDataQuery: 'first48', postDetailsProviderLast48HoursOrganicDataQuery: 'last48', postDetailsProviderAudienceQuery: 'audience' };
+
+function mergePostDetail(current = {}, parsed, now) {
+  const field = DETAIL_FIELD[parsed.operation];
+  const value = parsed.operation === OPERATIONS.postAudience ? parsed.audience : parsed.series;
+  const merged = { ...current, [parsed.postId]: { ...current[parsed.postId], [field]: value, capturedAt: now } };
+  const entries = Object.entries(merged);
+  if (entries.length <= MAX_POST_DETAILS) return merged;
+  return Object.fromEntries(entries.sort((a, b) => b[1].capturedAt - a[1].capturedAt).slice(0, MAX_POST_DETAILS));
+}
+
 function mergeFollowers(current = {}, info, now) {
   if (info.followers === undefined) return current;
   const day = dayKey(now);
@@ -136,6 +149,11 @@ function applyToAccount(account, parsed, now) {
         next.name = parsed.profile.name;
         next.avatar = parsed.profile.avatar;
       }
+      break;
+    case OPERATIONS.postFirst48:
+    case OPERATIONS.postLast48:
+    case OPERATIONS.postAudience:
+      next.postDetails = mergePostDetail(account.postDetails, parsed, now);
       break;
     case OPERATIONS.mentions:
       next.inbound = mergeInbound(account.inbound, parsed.mentions, account.handle);
