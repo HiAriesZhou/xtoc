@@ -127,7 +127,9 @@ export function createAnalyticsView(ctx) {
         ${aiCard(view.ai, ctx.ai?.configured)}
         <section class="card a-data">
           <div class="card-head"><div><h2>Data on this device</h2><p class="subtle">${esc(`${Object.keys(account.posts || {}).length} posts and ${Object.keys(account.daily || {}).length} days stored locally for @${account.handle || account.id}.`)}</p></div>
-          <button type="button" class="btn btn-ghost-danger btn-sm" data-action="clear-account">Delete this account’s data</button></div>
+          <div class="inline-actions"><label class="btn btn-secondary btn-sm">Import X CSV<input type="file" accept=".csv,text/csv" multiple hidden data-action="import-csv" /></label>
+          <button type="button" class="btn btn-ghost-danger btn-sm" data-action="clear-account">Delete this account’s data</button></div></div>
+          <p class="hint">If sync stops working, import the account overview or content CSV exported from X Analytics instead.</p>
         </section>
       </div>`;
     attachChartHover(main);
@@ -196,8 +198,18 @@ export function createAnalyticsView(ctx) {
     }
   }
 
+  async function importFiles(files) {
+    for (const file of files) {
+      const result = await ctx.rpc('analytics:importCsv', { text: await file.text(), accountId: view.accountId });
+      ctx.toast(result.kind === 'content' ? `Imported ${result.posts} posts from ${file.name}.` : `Imported ${result.days} days from ${file.name}.`);
+    }
+    await reload();
+    render();
+  }
+
   function onChange(event) {
     const action = event.target.dataset.action;
+    if (action === 'import-csv') return ctx.guard(() => importFiles([...event.target.files]))();
     if (action === 'sort') view.sort = event.target.value;
     if (action === 'account') {
       view.accountId = event.target.value;

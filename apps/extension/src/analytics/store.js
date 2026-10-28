@@ -78,11 +78,13 @@ function mergePosts(current = {}, posts, now) {
   const merged = { ...current };
   for (const post of posts) {
     const previous = current[post.id];
+    // A CSV row has only the day; keep what an earlier capture knew precisely.
+    const base = post.dayOnly && previous && !previous.dayOnly ? { ...previous, metrics: { ...previous.metrics, ...post.metrics } } : post;
     merged[post.id] = {
-      ...post,
+      ...base,
       firstSeenAt: previous?.firstSeenAt || now,
       updatedAt: now,
-      snapshots: addSnapshot(previous?.snapshots, post.metrics, now)
+      snapshots: addSnapshot(previous?.snapshots, base.metrics, now)
     };
   }
   return merged;

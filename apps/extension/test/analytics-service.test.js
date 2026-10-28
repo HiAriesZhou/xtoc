@@ -233,3 +233,18 @@ test('deleting analytics data makes the next sync backfill again', async () => {
   const { sync } = await service.load();
   assert.equal(sync.lastSuccessAt, null);
 });
+
+test('CSV import fills the account matched by the Post Link handle', async () => {
+  const { service } = harness();
+  await service.capture({ operation: 'contentPageQuery', body: content([tweet({ id: '1', createdAt: day0 })]) }, fromTab(1));
+  const csv = 'Post id,Date,Post text,Post Link,Impressions,Likes,Engagements,Bookmarks,Shares,New follows,Replies,Reposts,Profile visits,Detail Expands,URL Clicks,Hashtag Clicks,Permalink Clicks\n9,"Fri, Oct 23, 2026",hi,https://x.com/example/status/9,70,1,2,0,0,0,0,0,1,0,0,0,0';
+  assert.deepEqual(await service.importCsv({ text: csv }), { kind: 'content', posts: 1 });
+  const { data } = await service.load();
+  assert.equal(data.accounts[ACCOUNT_ID].posts['9'].metrics.Impressions, 70);
+  await assert.rejects(service.importCsv({ text: 'a,b\n1,2' }), /not an X Analytics export/);
+});
+
+test('CSV import needs a known account', async () => {
+  const { service } = harness();
+  await assert.rejects(service.importCsv({ text: 'Date,Impressions,Unfollows\n2026-10-23,5,0' }), /Sync from X once first/);
+});

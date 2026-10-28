@@ -13,6 +13,7 @@ import {
 } from './analytics/operations.js';
 import { parseCapture } from './analytics/parse.js';
 import { accountSummary, responseShape } from './analytics/diagnostics.js';
+import { parseAnalyticsCsv } from './analytics/csv.js';
 import { ANALYTICS_KEYS, applyCapture, emptyAnalytics, readAnalytics } from './analytics/store.js';
 
 // Kept under the ~30 s after which an idle MV3 worker may be stopped; a run
@@ -277,9 +278,34 @@ export function createAnalyticsService({
     };
   }
 
+  const MAX_CSV_CHARS = 10 * 1024 * 1024;
+
+  // Fallback import of X's own CSV exports into the same store.
+  async function importCsv(payload) {
+    const text = String(payload.text || '');
+    if (!text || text.length > MAX_CSV_CHARS) throw new Error('Choose an X Analytics CSV under 10 MB.');
+    const csv = parseAnalyticsCsv(text);
+    let counts = {};
+    await enqueue(async () => {
+      const state = readAnalytics(await read(ANALYTICS_KEYS.data));
+      const accounts = Object.values(state.accounts);
+      const byHandle = csv.profile?.handle && accounts.find((a) => a.handle?.toLowerCase() === csv.profile.handle.toLowerCase());
+      const chosen = byHandle?.id || (state.accounts[payload.accountId] ? payload.accountId : '') || (accounts.length === 1 ? accounts[0].id : '');
+      if (!chosen) throw new Error('Sync from X once first, so XTOC knows which account this file belongs to.');
+      const parsed =
+        csv.kind === 'content'
+          ? { operation: OPERATIONS.content, accountId: chosen, posts: csv.posts, profile: byHandle ? csv.profile : {} }
+          : { operation: OPERATIONS.overviewDaily, accountId: chosen, days: csv.days };
+      counts = csv.kind === 'content' ? { posts: csv.posts.length } : { days: Object.keys(csv.days).length };
+      await storage.set({ [ANALYTICS_KEYS.data]: applyCapture(state, parsed, { now: now() }) });
+    });
+    return { kind: csv.kind, ...counts };
+  }
+
   return {
     load,
     recover,
+    importCsv,
     diagnostics: readDiagnostics,
     seen: recordSeen,
     async capture(payload, sender) {

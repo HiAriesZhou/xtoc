@@ -236,6 +236,7 @@ const emptyGrid = () => Array.from({ length: 7 }, () => Array.from({ length: 24 
 export function postingGrid(posts, parts = localParts) {
   const grid = emptyGrid();
   for (const post of posts) {
+    if (post.dayOnly) continue; // imported from CSV: no time of day
     const { day, hour } = parts(post.createdAt);
     grid[day][hour].push(post.metrics?.Impressions || 0);
   }
