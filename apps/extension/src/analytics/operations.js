@@ -138,11 +138,11 @@ export function syncSteps(lastSuccessAt, now = Date.now()) {
 // that cap, the next step reads the older part of the range.
 export const CONTENT_PAGE_LIMIT = 1000;
 
-export function olderContentStep(range, oldestPostMs) {
+export function olderContentStep(range, oldestPostMs, n = 1) {
   const to = isoDay(oldestPostMs);
   if (!range?.from || to <= range.from) return null;
   return {
-    id: 'content-older',
+    id: `content-older-${n}`,
     url: contentUrl({ from: range.from, to }),
     expect: OPERATIONS.content,
     range: { from: range.from, to }

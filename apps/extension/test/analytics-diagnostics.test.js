@@ -37,3 +37,9 @@ test('accountSummary reports counts, ranges and key sets, not post text', () => 
   assert.equal(summary.inbound, 1);
   assert.doesNotMatch(JSON.stringify(summary), /private words|example/);
 });
+
+test('responseShape folds ID-keyed maps into one :id entry', () => {
+  const shape = responseShape({ byId: { '2112458505273983418': { n: 1 }, '2112458505273983419': { m: 'x' } } });
+  assert.deepEqual(shape, { byId: { ':id': { n: 'number', m: 'string' } } });
+  assert.doesNotMatch(JSON.stringify(shape), /2112458505/);
+});

@@ -50,6 +50,8 @@ test('olderContentStep continues below the oldest captured post, and stops at th
   const range = { from: '2026-01-01', to: '2026-10-26' };
   const step = olderContentStep(range, Date.parse('2026-06-15T10:00:00Z'));
   assert.equal(step.url, 'https://x.com/i/account_analytics/content/?type=all&from=2026-01-01&to=2026-06-15');
+  assert.equal(step.id, 'content-older-1');
+  assert.equal(olderContentStep(range, Date.parse('2026-06-15T10:00:00Z'), 2).id, 'content-older-2');
   assert.equal(olderContentStep(range, Date.parse('2026-01-01T10:00:00Z')), null);
 });
 

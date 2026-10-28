@@ -6,6 +6,7 @@ import {
   CONTENT_PAGE_LIMIT,
   isCapturePage,
   isPremiumRedirect,
+  isDiagnosticPath,
   olderContentStep,
   OPERATIONS,
   POST_DETAIL_OPERATIONS,
@@ -31,7 +32,9 @@ export function createAnalyticsService({
   tabs = chrome.tabs,
   now = Date.now,
   stepTimeoutMs = STEP_TIMEOUT_MS,
-  settleMs = SETTLE_MS
+  settleMs = SETTLE_MS,
+  // Diagnostics are collected only in development builds.
+  diagnosticsEnabled = /\(Development\)/.test(globalThis.chrome?.runtime?.getManifest?.()?.name || '')
 }) {
   const tabAccounts = new Map(); // tabId -> account ID seen on the current page of that tab
   let run = null;
@@ -41,13 +44,38 @@ export function createAnalyticsService({
   // Last capture per operation, for development diagnostics: field names and
   // types, page path and outcome. Never values, so it is safe to download.
   let diagnostics = {};
-  async function note(operation, sender, outcome, body) {
+  let seenOps = [];
+  let restored = false;
+
+  // Paths are reduced to known page prefixes with IDs replaced, so a report
+  // never names a post or an account.
+  function cleanPath(url) {
     let path = '';
     try {
-      path = new URL(sender.url).pathname;
+      path = new URL(url).pathname;
     } catch {
-      // No page URL.
+      return '';
     }
+    return isDiagnosticPath(path) ? path.replace(/\d{3,}/g, ':id').slice(0, 80) : '(other page)';
+  }
+
+  // After a worker restart, merge what session storage kept before writing.
+  async function restoreDiagnostics() {
+    if (restored) return;
+    restored = true;
+    try {
+      const saved = await session?.get([DIAGNOSTICS_KEY, `${DIAGNOSTICS_KEY}Seen`]);
+      diagnostics = { ...saved?.[DIAGNOSTICS_KEY], ...diagnostics };
+      seenOps = [...(saved?.[`${DIAGNOSTICS_KEY}Seen`] || []), ...seenOps].slice(-80);
+    } catch {
+      // Use the in-memory copy.
+    }
+  }
+
+  async function note(operation, sender, outcome, body) {
+    if (!diagnosticsEnabled) return;
+    await restoreDiagnostics();
+    const path = cleanPath(sender.url);
     diagnostics = {
       ...diagnostics,
       [operation]: { at: new Date(now()).toISOString(), path, ...outcome, shape: body === undefined ? null : responseShape(body) }
@@ -80,14 +108,13 @@ export function createAnalyticsService({
     const parsed = parseCapture(operation, body);
     await enqueue(async () => {
       const state = readAnalytics(await read(ANALYTICS_KEYS.data));
-      // Mentions carry no account ID: use the account seen in this tab, the
-      // account of the running sync, or the only stored account.
-      const only = Object.keys(state.accounts).length === 1 ? Object.keys(state.accounts)[0] : '';
-      const hint =
-        tabAccounts.get(tabId) ||
-        (parsed.operation === OPERATIONS.mentions || POST_DETAIL_OPERATIONS.has(parsed.operation)
-          ? (run && tabId === run.tabId && run.accountId) || only
-          : '');
+      // Mentions and post details carry no account ID. A post detail belongs
+      // to the account that has the post; otherwise use the account seen in
+      // this tab or the account of the sync running in it. Never guess.
+      const owner = POST_DETAIL_OPERATIONS.has(parsed.operation)
+        ? Object.values(state.accounts).find((account) => account.posts?.[parsed.postId])?.id
+        : '';
+      const hint = owner || tabAccounts.get(tabId) || (run && tabId === run.tabId ? run.accountId : '') || '';
       const next = applyCapture(state, parsed, { now: now(), accountHint: hint });
       try {
         await storage.set({ [ANALYTICS_KEYS.data]: next });
@@ -126,7 +153,8 @@ export function createAnalyticsService({
       running: false,
       trigger: done.trigger,
       lastAttemptAt: new Date(done.startedAt).toISOString(),
-      lastSuccessAt: error ? previous.lastSuccessAt || null : new Date(done.startedAt).toISOString(),
+      // Data deleted during the run: the next sync must backfill again.
+      lastSuccessAt: done.cleared ? null : error ? previous.lastSuccessAt || null : new Date(done.startedAt).toISOString(),
       ok: !error,
       error: error || null,
       steps: done.steps.map((step, i) => ({
@@ -168,7 +196,7 @@ export function createAnalyticsService({
     if (parsed.accountId) run.accountId = parsed.accountId;
     if (operation === OPERATIONS.content && parsed.rowCount >= CONTENT_PAGE_LIMIT && run.steps.length < MAX_STEPS) {
       const oldest = Math.min(...parsed.posts.map((post) => post.createdAt));
-      const older = olderContentStep(step.range, oldest);
+      const older = olderContentStep(step.range, oldest, run.steps.filter((s) => s.id.startsWith('content-older')).length + 1);
       if (older) run.steps.splice(run.index + 1, 0, older);
     }
     clearTimeout(run.timer);
@@ -184,7 +212,10 @@ export function createAnalyticsService({
     if (starting) return starting;
     starting = (async () => {
       const sync = await readSync();
-      const steps = syncSteps(sync.lastSuccessAt, now());
+      // Without stored posts (first sync, or data deleted) backfill 12 weeks.
+      const data = readAnalytics(await read(ANALYTICS_KEYS.data));
+      const hasPosts = Object.values(data.accounts).some((account) => Object.keys(account.posts || {}).length);
+      const steps = syncSteps(hasPosts ? sync.lastSuccessAt : null, now());
       const tab = await tabs.create({ url: steps[0].url, active: false });
       run = { trigger, tabId: tab.id, steps, index: 0, startedAt: now(), timer: null, settle: null };
       // Recorded now, so a run lost with the worker still counts toward the daily limit.
@@ -230,17 +261,14 @@ export function createAnalyticsService({
   });
 
   // Operation names seen on analytics and notifications pages (no content).
-  let seenOps = [];
   async function recordSeen(payload, sender) {
-    let path = '';
-    try {
-      path = new URL(sender.url).pathname;
-    } catch {
-      // No page URL.
-    }
+    if (!diagnosticsEnabled) return {};
+    const path = cleanPath(sender.url);
+    if (!path || path === '(other page)') return {};
+    await restoreDiagnostics();
     const entry = {
       at: new Date(now()).toISOString(),
-      path: path.slice(0, 80),
+      path,
       operation: String(payload.operation).slice(0, 80),
       status: Number(payload.status) || 0,
       contentType: String(payload.contentType || '').slice(0, 80),
@@ -256,18 +284,7 @@ export function createAnalyticsService({
   }
 
   async function readDiagnostics() {
-    try {
-      const saved = (await session?.get(DIAGNOSTICS_KEY))?.[DIAGNOSTICS_KEY];
-      if (saved) diagnostics = { ...saved, ...diagnostics };
-    } catch {
-      // Use the in-memory copy.
-    }
-    try {
-      const savedSeen = (await session?.get(`${DIAGNOSTICS_KEY}Seen`))?.[`${DIAGNOSTICS_KEY}Seen`];
-      if (savedSeen?.length > seenOps.length) seenOps = savedSeen;
-    } catch {
-      // Use the in-memory copy.
-    }
+    await restoreDiagnostics();
     const { data, sync } = await load();
     return {
       generatedAt: new Date(now()).toISOString(),
@@ -290,6 +307,8 @@ export function createAnalyticsService({
       const state = readAnalytics(await read(ANALYTICS_KEYS.data));
       const accounts = Object.values(state.accounts);
       const byHandle = csv.profile?.handle && accounts.find((a) => a.handle?.toLowerCase() === csv.profile.handle.toLowerCase());
+      if (csv.profile?.handle && !byHandle)
+        throw new Error(`This file is for @${csv.profile.handle}. Sync that account from X first, then import it.`);
       const chosen = byHandle?.id || (state.accounts[payload.accountId] ? payload.accountId : '') || (accounts.length === 1 ? accounts[0].id : '');
       if (!chosen) throw new Error('Sync from X once first, so XTOC knows which account this file belongs to.');
       const parsed =
@@ -297,7 +316,7 @@ export function createAnalyticsService({
           ? { operation: OPERATIONS.content, accountId: chosen, posts: csv.posts, profile: byHandle ? csv.profile : {} }
           : { operation: OPERATIONS.overviewDaily, accountId: chosen, days: csv.days };
       counts = csv.kind === 'content' ? { posts: csv.posts.length } : { days: Object.keys(csv.days).length };
-      await storage.set({ [ANALYTICS_KEYS.data]: applyCapture(state, parsed, { now: now() }) });
+      await storage.set({ [ANALYTICS_KEYS.data]: applyCapture(state, parsed, { now: now(), source: 'csv' }) });
     });
     return { kind: csv.kind, ...counts };
   }
@@ -343,6 +362,7 @@ export function createAnalyticsService({
       return prefs;
     },
     async clear(payload) {
+      if (run) run.cleared = true;
       await enqueue(async () => {
         const state = readAnalytics(await read(ANALYTICS_KEYS.data));
         if (!payload.accountId) return storage.set({ [ANALYTICS_KEYS.data]: emptyAnalytics() });

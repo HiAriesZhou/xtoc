@@ -32,7 +32,7 @@ function harness({ now = Date.parse('2026-10-26T12:00:00Z'), stepTimeoutMs = 200
     onUpdated: { addListener: (fn) => listeners.updated.push(fn) },
     onRemoved: { addListener: (fn) => listeners.removed.push(fn) }
   };
-  const service = createAnalyticsService({ storage, tabs, now: () => now, stepTimeoutMs, settleMs: 5 });
+  const service = createAnalyticsService({ diagnosticsEnabled: true, storage, tabs, now: () => now, stepTimeoutMs, settleMs: 5 });
   return { service, data, log, listeners };
 }
 
@@ -75,6 +75,7 @@ test('a later response without an account ID uses the account seen in the same t
 test('sync visits content, audience and overview in an inactive tab, then closes it', async () => {
   const { service, log, data } = harness();
   data.xtocAnalyticsSync = { lastSuccessAt: '2026-10-25T12:00:00.000Z' }; // one content window
+  data.xtocAnalytics = { version: 1, accounts: { 5: { id: '5', posts: { 1: { id: '1' } } } } }; // posts stored, so incremental
   assert.deepEqual(await service.sync(), { running: true });
   assert.deepEqual(log[0].slice(0, 1).concat(log[0][2]), ['create', false]);
   assert.match(log[0][1], /\/i\/account_analytics\/content\/\?type=all&from=2026-10-24&to=2026-10-26$/);
@@ -103,6 +104,7 @@ test('sync visits content, audience and overview in an inactive tab, then closes
 test('a missing Mentions timeline does not fail the sync', async () => {
   const { service, data } = harness({ stepTimeoutMs: 30 });
   data.xtocAnalyticsSync = { lastSuccessAt: '2026-10-25T12:00:00.000Z' };
+  data.xtocAnalytics = { version: 1, accounts: { 5: { id: '5', posts: { 1: { id: '1' } } } } }; // posts stored, so incremental
   await service.sync();
   const tab = fromTab(10);
   await service.capture({ operation: 'contentPageQuery', body: content([tweet({ id: '1', createdAt: day0 })]) }, tab);
@@ -199,13 +201,13 @@ test('seen operation names are kept for diagnostics, capped', async () => {
   assert.equal(report.seen.at(-1).path, '/notifications/mentions');
 });
 
-test('NotificationsTimeline without an account ID is stored for the only account', async () => {
+test('mentions outside a sync are not guessed onto a stored account', async () => {
   const { service } = harness();
   await service.capture({ operation: 'contentPageQuery', body: content([tweet({ id: '1', createdAt: day0 })]) }, fromTab(1));
   const body = { data: { viewer: { timeline: { instructions: [{ entries: [{ content: { itemContent: { tweet_results: { result: { __typename: 'Tweet', rest_id: '801', core: { user_results: { result: { legacy: { screen_name: 'zed' } } } }, legacy: { created_at: 'Tue Oct 28 08:00:00 +0000 2026' } } } } } }] }] } } } };
-  await service.capture({ operation: 'NotificationsTimeline', body }, fromTab(5, 'https://x.com/notifications/mentions'));
+  await assert.rejects(service.capture({ operation: 'NotificationsTimeline', body }, fromTab(5, 'https://x.com/notifications/mentions')), /which X account/);
   const { data } = await service.load();
-  assert.equal(data.accounts[ACCOUNT_ID].inbound['801'].handle, 'zed');
+  assert.equal(data.accounts[ACCOUNT_ID].inbound, undefined);
 });
 
 test('the first sync reads 12 weeks of content in three windows', async () => {
@@ -247,4 +249,53 @@ test('CSV import fills the account matched by the Post Link handle', async () =>
 test('CSV import needs a known account', async () => {
   const { service } = harness();
   await assert.rejects(service.importCsv({ text: 'Date,Impressions,Unfollows\n2026-10-23,5,0' }), /Sync from X once first/);
+});
+
+test('post details go to the account that has the post, even in a new tab', async () => {
+  const { service } = harness();
+  await service.capture({ operation: 'contentPageQuery', body: content([tweet({ id: '55', createdAt: day0 })]) }, fromTab(1));
+  const { postSeries } = await import('./analytics-fixtures.js');
+  await service.capture({ operation: 'postDetailsProviderFirst48HoursDataQuery', body: postSeries('55', day0) }, fromTab(9, 'https://x.com/i/account_analytics/content/55'));
+  const { data } = await service.load();
+  assert.ok(data.accounts[ACCOUNT_ID].postDetails['55'].first48);
+});
+
+test('deleting data during a sync keeps the next sync a full backfill', async () => {
+  const { service, data } = harness();
+  data.xtocAnalytics = { version: 1, accounts: { 5: { id: '5', posts: { 1: { id: '1' } } } } };
+  data.xtocAnalyticsSync = { lastSuccessAt: '2026-10-25T12:00:00.000Z' };
+  await service.sync();
+  await service.clear({});
+  const tab = fromTab(10);
+  await service.capture({ operation: 'contentPageQuery', body: content([tweet({ id: '1', createdAt: day0 })]) }, tab);
+  await wait(20);
+  await service.capture({ operation: 'audienceOverviewDataQuery', body: audience() }, tab);
+  await wait(20);
+  await service.capture({ operation: 'accountOverviewDailyQuery', body: overviewDaily() }, tab);
+  await wait(20);
+  await service.capture({ operation: 'notificationsQuery', body: mentions() }, fromTab(10, 'https://x.com/notifications/mentions'));
+  await wait(20);
+  assert.equal(data.xtocAnalyticsSync.lastSuccessAt, null);
+});
+
+test('diagnostics paths never name a post, and other pages are not recorded', async () => {
+  const { service } = harness();
+  await service.capture({ operation: 'contentPageQuery', body: content([tweet({ id: '1', createdAt: day0 })]) }, fromTab(1, 'https://x.com/i/account_analytics/content/2112458505273983418'));
+  await service.seen({ operation: 'X', status: 200 }, fromTab(1, 'https://x.com/someone/status/123456'));
+  const report = await service.diagnostics();
+  assert.equal(report.captures.contentPageQuery.path, '/i/account_analytics/content/:id');
+  assert.equal(report.seen.length, 0);
+});
+
+test('diagnostics are off unless enabled (release builds)', async () => {
+  const off = createAnalyticsService({ storage: { async get() { return {}; }, async set() {} }, tabs: { onUpdated: { addListener() {} }, onRemoved: { addListener() {} } } });
+  await off.seen({ operation: 'X' }, fromTab(1, 'https://x.com/notifications'));
+  assert.deepEqual((await off.diagnostics()).seen, []);
+});
+
+test('a CSV for an account XTOC has not synced is refused, not merged elsewhere', async () => {
+  const { service } = harness();
+  await service.capture({ operation: 'contentPageQuery', body: content([tweet({ id: '1', createdAt: day0 })]) }, fromTab(1));
+  const csv = 'Post id,Date,Post text,Post Link,Impressions,Likes,Engagements,Bookmarks,Shares,New follows,Replies,Reposts,Profile visits,Detail Expands,URL Clicks,Hashtag Clicks,Permalink Clicks\n9,"Fri, Oct 23, 2026",hi,https://x.com/someone_else/status/9,70,1,2,0,0,0,0,0,1,0,0,0,0';
+  await assert.rejects(service.importCsv({ text: csv, accountId: ACCOUNT_ID }), /@someone_else/);
 });

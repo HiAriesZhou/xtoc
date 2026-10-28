@@ -19,8 +19,18 @@ export function responseShape(value, depth = 0) {
     const items = value.slice(0, MAX_ARRAY_SAMPLE).map((item) => responseShape(item, depth + 1));
     return [items.reduce((acc, item) => (typeof item === 'object' ? merge(acc, item) : acc ?? item), undefined) ?? items[0]];
   }
-  if (typeof value === 'object')
-    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, responseShape(item, depth + 1)]));
+  if (typeof value === 'object') {
+    // Maps keyed by IDs (post or user IDs, timestamps) keep one merged ':id' entry.
+    let byId;
+    const out = {};
+    for (const [key, item] of Object.entries(value)) {
+      const shape = responseShape(item, depth + 1);
+      if (/^\d{3,}$/.test(key)) byId = typeof shape === 'object' ? merge(byId, shape) : byId ?? shape;
+      else out[key] = shape;
+    }
+    if (byId !== undefined) out[':id'] = byId;
+    return out;
+  }
   return typeof value;
 }
 
