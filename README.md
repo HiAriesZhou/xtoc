@@ -103,7 +103,7 @@ Saved text, clips, tags, notes, settings and bookmark import progress (your X ha
 
 ## Project links
 
-[Product website](https://xtoc.arieszhou.com) · [Project story](https://www.arieszhou.com/building#x-toc) · [Contributing](apps/extension/CONTRIBUTING.md)
+[Product website](https://xtoc.arieszhou.com) · [By AriesZhou](https://x.com/AriesZhou) · [Contributing](apps/extension/CONTRIBUTING.md)
 
 ## License
 
