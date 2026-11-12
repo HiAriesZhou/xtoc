@@ -2,17 +2,15 @@ name: Extension CI
 
 on:
   pull_request:
-    paths: &extension-paths
-      - 'apps/extension/**'
-      - 'README*.md'
-      - '.portfolio/**'
-      - '.github/workflows/ext-test.yml'
   push:
     branches: [main]
-    paths: *extension-paths
 
 permissions:
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   test:
@@ -24,8 +22,36 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Classify PR changes
+        id: changes
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          full=true
+          if [ "$EVENT_NAME" = pull_request ]; then
+            git -C "$GITHUB_WORKSPACE" diff --no-renames --name-only -z "$BASE_SHA"...HEAD > "$RUNNER_TEMP/changed-paths"
+            full=false
+            while IFS= read -r -d '' path; do
+              case "$path" in
+                apps/web/*|README.md|README.zh-CN.md|AGENTS.md|CLAUDE.md|apps/extension/CONTRIBUTING.md|apps/extension/marketing/README.md) ;;
+                *) full=true; break ;;
+              esac
+            done < "$RUNNER_TEMP/changed-paths"
+          fi
+          printf 'full=%s\n' "$full" >> "$GITHUB_OUTPUT"
+
+      # Root READMEs are version-test inputs, even when there is no app change.
+      - name: Check README version metadata
+        run: node --test test/release-metadata.test.js
 
       - name: Set up Node.js
+        if: steps.changes.outputs.full == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -33,12 +59,15 @@ jobs:
           cache-dependency-path: apps/extension/package-lock.json
 
       - name: Install dependencies
+        if: steps.changes.outputs.full == 'true'
         run: npm ci
 
       - name: Test
+        if: steps.changes.outputs.full == 'true'
         run: npm test
 
       - name: Build Chromium, Edge and Firefox
+        if: steps.changes.outputs.full == 'true'
         run: |
           npm run build
           npm run build:edge
