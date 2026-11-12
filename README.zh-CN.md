@@ -103,7 +103,7 @@ Chrome、Edge 和 Firefox 版本已在各自商店发布。Chromium、Firefox �
 
 ## 项目链接
 
-[产品网站](https://xtoc.arieszhou.com) · [项目案例](https://www.arieszhou.com/zh/building#x-toc) · [参与贡献](apps/extension/CONTRIBUTING.md)
+[产品网站](https://xtoc.arieszhou.com) · [作者 AriesZhou](https://x.com/AriesZhou) · [参与贡献](apps/extension/CONTRIBUTING.md)
 
 ## 许可证
 

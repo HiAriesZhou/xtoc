@@ -16,6 +16,6 @@ export function pageMetadata(view: SiteView): Metadata {
     alternates: { canonical: viewPaths[view] },
     robots: { index: view === "home" || view === "docs", follow: true },
     openGraph: { title, description, url: viewPaths[view], type: "website", siteName: "XTOC", images: [{ url: "/images/x-toc-social-1280x640.png", width: 1280, height: 640, alt: "XTOC table of contents and local clips for X Articles" }] },
-    twitter: { card: "summary_large_image", title, description, images: ["/images/x-toc-social-1280x640.png"] },
+    twitter: { card: "summary_large_image", creator: "@AriesZhou", title, description, images: ["/images/x-toc-social-1280x640.png"] },
   };
 }

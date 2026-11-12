@@ -15,8 +15,8 @@
 
 本仓库用于维护 XTOC 的公开 landing page 和公开文档。
 
-- 扩展源码：<https://github.com/HiAriesZhou/x-toc>
-- 网站源码：<https://github.com/HiAriesZhou/x-toc-landing-page>
+- 扩展源码：<https://github.com/HiAriesZhou/xtoc>
+- 网站源码：<https://github.com/HiAriesZhou/xtoc/tree/main/apps/web>
 - Chrome Web Store：<https://chromewebstore.google.com/detail/nbdgpckkcfkomnmdefinikjijgljgjfp?utm_source=item-share-cb>
 
 ## 公开产品文案

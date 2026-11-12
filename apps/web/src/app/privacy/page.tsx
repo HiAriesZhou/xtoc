@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   description,
   alternates: { canonical: "/privacy" },
   openGraph: { title: "Privacy Policy | XTOC", description, url: "/privacy" },
-  twitter: { title: "Privacy Policy | XTOC", description },
+  twitter: { title: "Privacy Policy | XTOC", description, creator: "@AriesZhou" },
 };
 
 export default function PrivacyPage() {
@@ -81,7 +81,7 @@ export default function PrivacyPage() {
           <p>This policy will be updated when the extension’s data handling changes. The date above identifies the latest revision.</p>
         </section>
       </main>
-      <footer className={styles.footer}><Link href="/">← Back to XTOC</Link><Link href="/docs">Documentation</Link></footer>
+      <footer className={styles.footer}><Link href="/">← Back to XTOC</Link><Link href="/docs">Documentation</Link><a href="https://x.com/AriesZhou" target="_blank" rel="noopener noreferrer">By AriesZhou</a></footer>
     </div>
   );
 }
