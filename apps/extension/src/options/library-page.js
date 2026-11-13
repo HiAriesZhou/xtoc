@@ -1,11 +1,12 @@
-// Library shell: hash routing between Clips, Bookmarks and Settings, shared
+// Library shell: hash routing between Clips, Bookmarks, Analytics and Settings, shared
 // state loading, the detail drawer and status toasts.
 import { clipGroups, KEYS } from '../library/model.js';
 import { createClipsView } from './clips-view.js';
 import { createBookmarksView } from './bookmarks-view.js';
 import { createSettingsView } from './settings-view.js';
+import { createAnalyticsView } from './analytics-view.js';
 
-const ROUTES = ['clips', 'bookmarks', 'settings'];
+const ROUTES = ['clips', 'bookmarks', 'analytics', 'settings'];
 const TOAST_MS = 3200;
 
 const main = document.getElementById('main');
@@ -69,6 +70,7 @@ const ctx = {
 const views = {
   clips: createClipsView(ctx),
   bookmarks: createBookmarksView(ctx),
+  analytics: createAnalyticsView(ctx),
   settings: createSettingsView(ctx)
 };
 
@@ -91,6 +93,7 @@ function render() {
     link.classList.toggle('active', active);
     link.toggleAttribute('aria-current', active);
   });
+  document.querySelector('.viz-tip')?.setAttribute('hidden', '');
   views[route].render(main);
 }
 

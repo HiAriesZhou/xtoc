@@ -60,6 +60,14 @@ export const PROVIDERS = [
     avoid: /vision|thinking/
   },
   {
+    id: 'xai',
+    label: 'xAI Grok',
+    baseUrl: 'https://api.x.ai/v1',
+    keyUrl: 'https://console.x.ai',
+    prefer: [/grok.*fast/, /grok.*mini/],
+    avoid: /image|imagine|vision|video/
+  },
+  {
     id: 'custom',
     label: 'Custom (OpenAI-compatible)',
     baseUrl: '',
