@@ -1,8 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/chrome-manifest.json",
-  "chromium:manifest_version": 3,
-  "firefox:manifest_version": 2,
-  "version": "0.9.0",
+  "manifest_version": 3,
+  "version": "0.9.1",
   "name": "XTOC: Navigate & Clip X Articles",
   "description": "Navigate long X articles with a table of contents, and save posts, articles and passages to a local library you can export.",
   "icons": {
@@ -11,7 +10,7 @@
     "48": "icons/logo-48.png",
     "128": "icons/logo-128.png"
   },
-  "chromium:action": {
+  "action": {
     "default_icon": {
       "16": "icons/logo-16.png",
       "32": "icons/logo-32.png",
@@ -21,45 +20,23 @@
     "default_popup": "popup/index.html",
     "default_title": "XTOC"
   },
-  "chromium:options_page": "options/index.html",
-  "firefox:options_ui": { "page": "options/index.html", "open_in_tab": true },
-  "firefox:browser_action": {
-    "default_icon": {
-      "16": "icons/logo-16.png",
-      "32": "icons/logo-32.png",
-      "48": "icons/logo-48.png",
-      "128": "icons/logo-128.png"
-    },
-    "default_popup": "popup/index.html",
-    "default_title": "XTOC"
-  },
-  "chromium:permissions": [
+  "options_page": "options/index.html",
+  "permissions": [
     "contextMenus",
     "activeTab",
     "storage",
     "unlimitedStorage",
     "scripting"
   ],
-  "chromium:host_permissions": [
+  "host_permissions": [
     "https://x.com/*",
     "https://twitter.com/*"
   ],
-  "chromium:optional_host_permissions": ["https://*/*"],
-  "firefox:permissions": ["contextMenus", "activeTab", "storage", "unlimitedStorage", "https://x.com/*", "https://twitter.com/*"],
-  "firefox:optional_permissions": ["https://*/*"],
-  "firefox:browser_specific_settings": {
-    "gecko": {
-      "id": "xtoc@arieszhou.com",
-      "strict_min_version": "140.0",
-      "data_collection_permissions": { "required": ["none"], "optional": ["websiteContent"] }
-    },
-    "gecko_android": { "strict_min_version": "142.0" }
-  },
+  "optional_host_permissions": [
+    "https://*/*"
+  ],
   "background": {
-    "chromium:service_worker": "background.js",
-    "firefox:scripts": [
-      "background.js"
-    ]
+    "service_worker": "background.js"
   },
   "content_scripts": [
     {

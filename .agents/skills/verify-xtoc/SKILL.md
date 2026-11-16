@@ -62,16 +62,15 @@ Every run writes to `<evidence-root>/<timestamp>/`. Set `XTOC_VERIFY_EVIDENCE` t
 
 Inspect screenshots as well as JSON. A screenshot alone, empty error log, build success, direct handler call, or injected fake `chrome.*` API is not sufficient. Mock only production boundaries (here X's HTTP document); never mock storage, messaging, or extension UI. Record skipped flows explicitly. Check background/page errors; investigate unexpected errors rather than filtering them out to pass.
 
-**Not established by this fixture:** authenticated/live X DOM compatibility, X SPA lifecycle, toolbar popup behavior, true browser restart persistence, Firefox/Edge runtime parity, AI provider permissions/network behavior, exports/deletion unless separately driven, or the website's responsive/accessibility behavior. Do not claim real-x.com validation without a separately authorized logged-in session. Opening Options by URL verifies Library rendering but does not prove the popup's Library button.
+**Not established by this fixture:** authenticated/live X DOM compatibility, X SPA lifecycle, toolbar popup behavior, true browser restart persistence, AI provider permissions/network behavior, exports/deletion unless separately driven, or the website's responsive/accessibility behavior. Do not claim real-x.com validation without a separately authorized logged-in session. Opening Options by URL verifies Library rendering but does not prove the popup's Library button.
 
 Run other repo checks when relevant:
 
 ```bash
-(cd apps/extension && npm run build:firefox && npm run build:edge)
 (cd apps/web && npm ci && npm run lint && npm run build)
 ```
 
-There is no extension lint script. Builds are not cross-browser runtime proof. Keep check output in the same external evidence directory. No ZIP packaging, release, push, deployment, or store action is part of verification.
+There is no extension lint script. Builds are not Chrome runtime proof. Keep check output in the same external evidence directory. No ZIP packaging, release, push, deployment, or store action is part of verification.
 
 ## Cleanup
 
