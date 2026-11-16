@@ -14,7 +14,7 @@ function harness({ mode = 'manual', tasks, now = Date.parse('2026-11-16T12:00:00
   data.xtocAnalyticsSync ||= { version: 2, activeAccountId: '123', accounts: { '123': { pending: tasks || [], windows: {}, failures: 0 } } };
   const tabs = {
     create: async options => { log.push(['create', options]); const tab = { id: nextId++, ...options }; tabMap.set(tab.id, tab); return tab; },
-    update: async (id, options) => { log.push(['update', id, options]); if (failNavigation) throw Error('navigation failed'); Object.assign(tabMap.get(id), options); },
+    update: async (id, options) => { log.push(['update', id, options]); if (failNavigation === true || typeof failNavigation === 'number' && log.filter(e => e[0] === 'update').length === failNavigation) throw Error('navigation failed'); Object.assign(tabMap.get(id), options); },
     get: async id => { if (!tabMap.has(id)) throw Error('closed'); return tabMap.get(id); },
     remove: async id => { log.push(['remove', id]); tabMap.delete(id); events.removed.forEach(fn => fn(id)); },
     onUpdated: { addListener: fn => events.updated.push(fn) }, onRemoved: { addListener: fn => events.removed.push(fn) }
@@ -192,4 +192,25 @@ test('failed first navigation closes its owned blank tab', async () => {
   assert.equal(h.tabMap.size, 0);
   assert.equal(h.q().errorKind, 'network');
   assert.equal(h.q().pending.length, 1);
+});
+
+
+test('failed subsequent navigation closes the previous controlled page', async () => {
+  const audience = { id: 'audience', kind: 'audience', url: 'https://x.com/i/account_analytics/audience', expect: 'audienceOverviewDataQuery' };
+  const h = harness({ tasks: [task(), audience], failNavigation: 2 });
+  await h.runner.start(); await h.complete();
+  assert.equal(h.runner.isRunning(), false);
+  assert.equal(h.tabMap.size, 0);
+  assert.equal(h.q().errorKind, 'network');
+  assert.equal(h.q().pending[0].id, 'audience');
+});
+
+
+test('a user-navigated sync tab is neither overwritten nor closed', async () => {
+  const h = harness({ tasks: [task(), task('2026-11-14')] }); await h.runner.start();
+  h.tabMap.get(10).url = 'https://x.com/home';
+  await h.complete();
+  assert.equal(h.tabMap.get(10).url, 'https://x.com/home');
+  assert.equal(h.q().errorKind, 'navigation');
+  assert.equal(h.log.filter(e => e[0] === 'update').length, 1);
 });

@@ -5,6 +5,12 @@ import { MENTION_OPERATIONS, isPremiumRedirect, isAnalyticsPage } from './analyt
 import { ALARM_NAME, BATCH_MS, BATCH_PAGES, CONTINUE_DELAY, DAY, SYNC_INTERVAL, coverageFor, isoDay, planSync, refinements, retryDelay, syncMode } from './analytics/schedule.js';
 const OWN_TAB = 'xtocAnalyticsOwnedTab';
 const MAX_DAILY_PAGES = 48;
+const samePage = (actual, expected) => {
+  try {
+    const a = new URL(actual), b = new URL(expected);
+    return a.origin === b.origin && a.pathname.replace(/\/$/, '') === b.pathname.replace(/\/$/, '');
+  } catch { return false; }
+};
 export function createAnalyticsSync({ storage, session, repository, tabs, alarms, now = Date.now, stepTimeoutMs = 45000, settleMs = 1500 }) {
   let run = null;
   const retired = new Map();
@@ -31,9 +37,10 @@ export function createAnalyticsSync({ storage, session, repository, tabs, alarms
       try {
         const tab = tabs.get ? await tabs.get(tabId) : { url: owned.url };
         // Never close a user-navigated tab or an ID recycled after restart.
-        const actual = new URL(tab.pendingUrl || tab.url);
-        const expected = new URL(owned.url);
-        if (owned.allowBlank && actual.href === 'about:blank' || actual.origin === expected.origin && actual.pathname.replace(/\/$/, '') === expected.pathname.replace(/\/$/, '')) await tabs.remove(tabId);
+        const actual = tab.pendingUrl || tab.url;
+        // During a navigation the browser can still show the last controlled
+        // page. Preserve both addresses until tabs.update confirms success.
+        if ([owned.url, owned.previousUrl].some(url => url && samePage(actual, url))) await tabs.remove(tabId);
       } catch { /* the owned tab already closed */ }
       await session.remove?.(OWN_TAB);
     }
@@ -83,18 +90,25 @@ export function createAnalyticsSync({ storage, session, repository, tabs, alarms
       q.error = 'Daily page budget reached. Saved progress resumes tomorrow.';
       s.error = q.error; await save(s); await schedule(s); return;
     }
+    if (tabs.get) {
+      try {
+        const tab = await tabs.get(run.tabId);
+        if (!samePage(tab.pendingUrl || tab.url, run.currentUrl)) return finish(s, 'Sync paused because its tab was navigated elsewhere.', 'navigation', true);
+      } catch { return finish(s, 'Sync paused because its tab is unavailable.', 'closed', true); }
+    }
     const task = q.pending[0];
     run.task = task; run.armedAt = null; run.ready = false; run.identityVerified = false; run.candidate = null; run.documentId = null;
     run.pages++; s.budget.pages++;
     s.active = { tabId: run.tabId, token: run.token, taskId: task.id, url: task.url };
     await save(s);
-    await session?.set({ [OWN_TAB]: { tabId: run.tabId, token: run.token, url: task.url, allowBlank: run.pages === 1 } });
+    await session?.set({ [OWN_TAB]: { tabId: run.tabId, token: run.token, url: task.url, previousUrl: run.currentUrl } });
     clearTimeout(run.timer);
     run.timer = setTimeout(() => serial(async () => {
       if (run?.task.id === task.id) await finish(await state(), 'X did not return a verified date window. Saved data is kept; retry is scheduled.', 'timeout');
     }), stepTimeoutMs);
     try {
       await tabs.update(run.tabId, { url: task.url });
+      run.currentUrl = task.url;
       await session?.set({ [OWN_TAB]: { tabId: run.tabId, token: run.token, url: task.url } });
       await schedule(s);
     }
@@ -133,7 +147,7 @@ export function createAnalyticsSync({ storage, session, repository, tabs, alarms
     let tab;
     try { tab = await tabs.create({ url: 'about:blank', active: false }); }
     catch { await finish(s, 'Could not open an inactive X tab.', 'network'); return { running: false }; }
-    run = { tabId: tab.id, token: crypto.randomUUID(), accountId: id, startedAt: now(), pages: 0, trigger };
+    run = { tabId: tab.id, currentUrl: 'about:blank', token: crypto.randomUUID(), accountId: id, startedAt: now(), pages: 0, trigger };
     s.running = true;
     await next(s);
     return { running: Boolean(run) };
