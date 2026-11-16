@@ -7,7 +7,6 @@ import { createVault, idbStore, memoryStore } from './library/key-vault.js';
 import { aiPermissions } from './library/ai-permissions.js';
 import { IMPORT_KEY, importStatus, nextCheckpoints, usableCheckpoint, validScope } from './library/bookmark-import.js';
 import { createAnalyticsService } from './analytics-service.js';
-import { ANALYTICS_KEYS, readAnalytics } from './analytics/store.js';
 import { interpretationInput } from './analytics/insights.js';
 import { generateInterpretation } from './library/ai.js';
 
@@ -208,7 +207,7 @@ async function runAI(action, payload) {
       throw new Error('API permission was removed. Save the AI settings again.');
     }
     if (action === 'analytics:interpret') {
-      const data = readAnalytics((await chrome.storage.local.get(ANALYTICS_KEYS.data))[ANALYTICS_KEYS.data]);
+      const { data } = await analytics.load({ accountId: payload.accountId });
       const account = data.accounts[payload.accountId];
       if (!account) throw new Error('No analytics for this account yet.');
       timer = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);

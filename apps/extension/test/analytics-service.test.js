@@ -1,4 +1,6 @@
 import test from 'node:test';
+import 'fake-indexeddb/auto';
+import { createAnalyticsRepository } from '../src/analytics-db.js';
 import assert from 'node:assert/strict';
 import { createAnalyticsService } from '../src/analytics-service.js';
 import { ACCOUNT_ID, audience, content, day0, mentions, overviewDaily, overviewHourly, tweet } from './analytics-fixtures.js';
@@ -32,7 +34,7 @@ function harness({ now = Date.parse('2026-10-26T12:00:00Z'), stepTimeoutMs = 200
     onUpdated: { addListener: (fn) => listeners.updated.push(fn) },
     onRemoved: { addListener: (fn) => listeners.removed.push(fn) }
   };
-  const service = createAnalyticsService({ diagnosticsEnabled: true, storage, tabs, now: () => now, stepTimeoutMs, settleMs: 5 });
+  const service = createAnalyticsService({ diagnosticsEnabled: true, repository: createAnalyticsRepository({ storage, name: crypto.randomUUID() }), storage, tabs, now: () => now, stepTimeoutMs, settleMs: 5 });
   return { service, data, log, listeners };
 }
 
@@ -207,7 +209,7 @@ test('mentions outside a sync are not guessed onto a stored account', async () =
   const body = { data: { viewer: { timeline: { instructions: [{ entries: [{ content: { itemContent: { tweet_results: { result: { __typename: 'Tweet', rest_id: '801', core: { user_results: { result: { legacy: { screen_name: 'zed' } } } }, legacy: { created_at: 'Tue Oct 28 08:00:00 +0000 2026' } } } } } }] }] } } } };
   await assert.rejects(service.capture({ operation: 'NotificationsTimeline', body }, fromTab(5, 'https://x.com/notifications/mentions')), /which X account/);
   const { data } = await service.load();
-  assert.equal(data.accounts[ACCOUNT_ID].inbound, undefined);
+  assert.deepEqual(data.accounts[ACCOUNT_ID].inbound, {});
 });
 
 test('the first sync reads 12 weeks of content in three windows', async () => {

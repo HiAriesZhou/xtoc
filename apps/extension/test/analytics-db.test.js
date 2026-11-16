@@ -1,0 +1,73 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import 'fake-indexeddb/auto';
+import { createAnalyticsRepository } from '../src/analytics-db.js';
+import { parseCapture } from '../src/analytics/parse.js';
+import { OPERATIONS } from '../src/analytics/operations.js';
+import { overviewDaily, content, tweet, day0, ACCOUNT_ID } from './analytics-fixtures.js';
+const fixture = (legacy = { version: 1, accounts: {} }) => {
+  const data = { xtocAnalytics: structuredClone(legacy) };
+  const storage = { async get(key) { return { [key]: structuredClone(data[key]) }; }, async set(values) { Object.assign(data, structuredClone(values)); } };
+  const name = `analytics-${crypto.randomUUID()}`;
+  const repo = createAnalyticsRepository({ storage, name });
+  return { repo, data, storage, name };
+};
+test('migration verifies all records, preserves legacy and is idempotent across instances', async () => {
+  const legacy = { version: 1, accounts: { [ACCOUNT_ID]: { id: ACCOUNT_ID, handle: 'fixture', daily: { '2020-01-01': { Impressions: 0 } }, posts: { a: { id: 'a', createdAt: 1, metrics: {} } } } } };
+  const { repo, data, storage, name } = fixture(legacy);
+  await repo.ready();
+  assert.deepEqual(data.xtocAnalytics, legacy);
+  assert.equal((await repo.read()).accounts[ACCOUNT_ID].daily['2020-01-01'].Impressions, 0);
+  const second = createAnalyticsRepository({ storage, name });
+  await second.ready();
+  assert.equal((await second.accounts())[0].counts.posts, 1);
+  await repo.close(); await second.close();
+});
+test('failed migration rolls back and retries with original recovery copy intact', async () => {
+  const broken = { version: 1, accounts: { [ACCOUNT_ID]: { id: ACCOUNT_ID, posts: { a: { id: 'a', uncloneable: () => {} } } } } };
+  const data = { xtocAnalytics: broken };
+  const storage = { async get(key) { return { [key]: data[key] }; }, async set(v) { Object.assign(data, v); } };
+  const repo = createAnalyticsRepository({ storage, name: crypto.randomUUID() });
+  await assert.rejects(repo.ready());
+  assert.equal(typeof data.xtocAnalytics.accounts[ACCOUNT_ID].posts.a.uncloneable, 'function');
+  delete broken.accounts[ACCOUNT_ID].posts.a.uncloneable;
+  await repo.ready();
+  assert.equal((await repo.accounts())[0].counts.posts, 1);
+  await repo.close();
+});
+test('incremental writes merge only affected records and retain unknown metrics', async () => {
+  const { repo } = fixture();
+  await repo.apply(parseCapture(OPERATIONS.overviewDaily, overviewDaily({ days: 2 })), { now: day0 });
+  await repo.apply(parseCapture(OPERATIONS.overviewDaily, overviewDaily({ days: 1 })), { now: day0 });
+  const post = parseCapture(OPERATIONS.content, content([tweet({ id: '1', createdAt: day0 })]));
+  await repo.apply(post, { now: day0 });
+  await repo.apply(post, { now: day0 + 1 });
+  const account = (await repo.read()).accounts[ACCOUNT_ID];
+  assert.equal(account.counts.daily, 2);
+  assert.equal(account.counts.posts, 1);
+  assert.equal(account.posts['1'].snapshots.length, 1);
+  assert.equal(await repo.ownerOf('1'), ACCOUNT_ID);
+  assert.equal(Object.keys((await repo.read({ since: day0 + 1 })).accounts[ACCOUNT_ID].posts).length, 0);
+  await repo.close();
+});
+test('explicit account deletion clears both stores without resurrection or touching other accounts', async () => {
+  const { repo, data, storage, name } = fixture({ version: 1, accounts: { '1': { id: '1', daily: { '2020-01-01': { Impressions: 1 } } }, '2': { id: '2' } } });
+  await repo.clear('1');
+  assert.deepEqual(Object.keys(data.xtocAnalytics.accounts), ['2']);
+  await repo.close();
+  const reopened = createAnalyticsRepository({ storage, name });
+  assert.deepEqual((await reopened.accounts()).map(a => a.id), ['2']);
+  await reopened.clear();
+  assert.equal((await reopened.accounts()).length, 0);
+  await reopened.close();
+});
+test('large post history survives migration and a single-post refresh', { timeout: 30000 }, async () => {
+  const size = process.env.XTOC_SCALE_TESTS ? 100000 : 10001;
+  const posts = Object.fromEntries(Array.from({ length: size }, (_, i) => [String(i + 1), { id: String(i + 1), createdAt: day0, metrics: { Impressions: i }, snapshots: [] }]));
+  const { repo } = fixture({ version: 1, accounts: { [ACCOUNT_ID]: { id: ACCOUNT_ID, posts } } });
+  await repo.ready();
+  await repo.apply(parseCapture(OPERATIONS.content, content([tweet({ id: '1', createdAt: day0 })])), { now: day0 + 1 });
+  assert.equal((await repo.accounts())[0].counts.posts, size);
+  assert.equal(await repo.ownerOf(String(size)), ACCOUNT_ID);
+  await repo.close();
+});

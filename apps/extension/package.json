@@ -21,9 +21,9 @@
     "prebuild:zip": "npm run check:store-assets",
     "build:zip": "npm run build && node tooling/package-release.mjs"
   },
-  "dependencies": {},
   "devDependencies": {
-    "extension": "^3.7.0"
+    "extension": "^3.7.0",
+    "fake-indexeddb": "^6.2.8"
   },
   "packageManager": "npm@10.8.2"
 }

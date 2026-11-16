@@ -1,4 +1,5 @@
 import test from 'node:test';
+import 'fake-indexeddb/auto';
 import assert from 'node:assert/strict';
 
 let listener;

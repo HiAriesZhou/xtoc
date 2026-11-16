@@ -15,7 +15,8 @@ import {
 import { parseCapture } from './analytics/parse.js';
 import { accountSummary, responseShape } from './analytics/diagnostics.js';
 import { parseAnalyticsCsv } from './analytics/csv.js';
-import { ANALYTICS_KEYS, applyCapture, emptyAnalytics, readAnalytics } from './analytics/store.js';
+import { ANALYTICS_KEYS } from './analytics/store.js';
+import { createAnalyticsRepository } from './analytics-db.js';
 
 // Kept under the ~30 s after which an idle MV3 worker may be stopped; a run
 // lost that way is cleaned up by recover() on the next event.
@@ -31,6 +32,7 @@ export function createAnalyticsService({
   session = globalThis.chrome?.storage?.session,
   tabs = chrome.tabs,
   now = Date.now,
+  repository = createAnalyticsRepository({ storage }),
   stepTimeoutMs = STEP_TIMEOUT_MS,
   settleMs = SETTLE_MS,
   // Diagnostics are collected only in development builds.
@@ -98,26 +100,25 @@ export function createAnalyticsService({
   const readSync = async () => (await read(ANALYTICS_KEYS.sync)) || {};
   const writeSync = (value) => storage.set({ [ANALYTICS_KEYS.sync]: value });
 
-  async function load() {
+  async function load(options = {}) {
     await recover();
-    const [data, prefs, sync] = await Promise.all([read(ANALYTICS_KEYS.data), readPrefs(), readSync()]);
-    return { data: readAnalytics(data), prefs, sync: { ...sync, running: Boolean(run) } };
+    const [data, prefs, sync] = await Promise.all([repository.read(options), readPrefs(), readSync()]);
+    return { data, prefs, sync: { ...sync, running: Boolean(run) } };
   }
 
   async function store(operation, body, tabId) {
     const parsed = parseCapture(operation, body);
     await enqueue(async () => {
-      const state = readAnalytics(await read(ANALYTICS_KEYS.data));
       // Mentions and post details carry no account ID. A post detail belongs
       // to the account that has the post; otherwise use the account seen in
       // this tab or the account of the sync running in it. Never guess.
       const owner = POST_DETAIL_OPERATIONS.has(parsed.operation)
-        ? Object.values(state.accounts).find((account) => account.posts?.[parsed.postId])?.id
+        ? await repository.ownerOf(parsed.postId)
         : '';
       const hint = owner || tabAccounts.get(tabId) || (run && tabId === run.tabId ? run.accountId : '') || '';
-      const next = applyCapture(state, parsed, { now: now(), accountHint: hint });
+      if (!/^\d{1,25}$/.test(parsed.accountId || hint)) throw new Error('Could not tell which X account this data belongs to.');
       try {
-        await storage.set({ [ANALYTICS_KEYS.data]: next });
+        await repository.apply(parsed, { now: now(), accountHint: hint });
       } catch {
         throw new Error('Could not save analytics locally. Storage may be full.');
       }
@@ -213,8 +214,8 @@ export function createAnalyticsService({
     starting = (async () => {
       const sync = await readSync();
       // Without stored posts (first sync, or data deleted) backfill 12 weeks.
-      const data = readAnalytics(await read(ANALYTICS_KEYS.data));
-      const hasPosts = Object.values(data.accounts).some((account) => Object.keys(account.posts || {}).length);
+      const data = { accounts: Object.fromEntries((await repository.accounts()).map(a => [a.id, a])) };
+      const hasPosts = Object.values(data.accounts).some((account) => account.counts?.posts || 0);
       const steps = syncSteps(hasPosts ? sync.lastSuccessAt : null, now());
       const tab = await tabs.create({ url: steps[0].url, active: false });
       run = { trigger, tabId: tab.id, steps, index: 0, startedAt: now(), timer: null, settle: null };
@@ -304,7 +305,7 @@ export function createAnalyticsService({
     const csv = parseAnalyticsCsv(text);
     let counts = {};
     await enqueue(async () => {
-      const state = readAnalytics(await read(ANALYTICS_KEYS.data));
+      const state = { accounts: Object.fromEntries((await repository.accounts()).map(a => [a.id, a])) };
       const accounts = Object.values(state.accounts);
       const byHandle = csv.profile?.handle && accounts.find((a) => a.handle?.toLowerCase() === csv.profile.handle.toLowerCase());
       if (csv.profile?.handle && !byHandle)
@@ -316,7 +317,7 @@ export function createAnalyticsService({
           ? { operation: OPERATIONS.content, accountId: chosen, posts: csv.posts, profile: byHandle ? csv.profile : {} }
           : { operation: OPERATIONS.overviewDaily, accountId: chosen, days: csv.days };
       counts = csv.kind === 'content' ? { posts: csv.posts.length } : { days: Object.keys(csv.days).length };
-      await storage.set({ [ANALYTICS_KEYS.data]: applyCapture(state, parsed, { now: now(), source: 'csv' }) });
+      await repository.apply(parsed, { now: now(), source: 'csv' });
     });
     return { kind: csv.kind, ...counts };
   }
@@ -364,10 +365,7 @@ export function createAnalyticsService({
     async clear(payload) {
       if (run) run.cleared = true;
       await enqueue(async () => {
-        const state = readAnalytics(await read(ANALYTICS_KEYS.data));
-        if (!payload.accountId) return storage.set({ [ANALYTICS_KEYS.data]: emptyAnalytics() });
-        const { [payload.accountId]: _removed, ...accounts } = state.accounts;
-        return storage.set({ [ANALYTICS_KEYS.data]: { ...state, accounts } });
+        await repository.clear(payload.accountId);
       });
       // Without stored posts the next sync must backfill, not read only new days.
       await writeSync({ ...(await readSync()), lastSuccessAt: null });
