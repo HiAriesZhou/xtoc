@@ -1,6 +1,6 @@
 // Section renderers for the Analytics page. Each takes computed results from
 // src/analytics and returns HTML; every dynamic value is escaped.
-import { audienceGrid, breakdown, funnel, heatmapMetric, postingGrid, topSlots } from '../analytics/metrics.js';
+import { contentPerformance, metricValue, derived, audienceGrid, breakdown, heatmapMetric, postingGrid, topSlots } from '../analytics/metrics.js';
 import { growthCurve, halfLife, medianHalfLife, postDetailSeries } from '../analytics/insights.js';
 import {
   barList,
@@ -8,7 +8,6 @@ import {
   dataTable,
   divergingColumns,
   format,
-  funnelChart,
   heatmap,
   lineChart,
   sparkline
@@ -50,16 +49,16 @@ function deltaBadge(kpi) {
 }
 
 export function coverageNote(summary) {
-  if (!summary.coverage || summary.coverage >= summary.days) return '';
-  return `<p class="hint a-coverage">${esc(`Daily totals cover ${summary.coverage} of ${summary.days} days so far. X's overview sends its last 7 days by default; each sync adds days, and choosing a longer range once on X Analytics fills in more.`)}</p>`;
+  if (summary.coverage >= summary.days) return '';
+  return `<p class="hint a-coverage">${esc(`Daily totals cover ${summary.coverage} of ${summary.days} days so far. Missing days are unknown, not zero. Import an overview CSV to fill gaps. Period comparisons require complete data on both sides.`)}</p>`;
 }
 
 export function kpiTiles(summary) {
   const trend = {
-    Impressions: summary.series.map((d) => (d.hasData ? d.Impressions || 0 : null)),
-    ProfileVisits: summary.series.map((d) => (d.hasData ? d.ProfileVisits || 0 : null)),
-    netFollows: summary.series.map((d) => (d.hasData ? (d.Follows || 0) - (d.Unfollows || 0) : null)),
-    engagementRate: summary.series.map((d) => (d.hasData && d.Impressions ? (d.Engagements || 0) / d.Impressions : null))
+    Impressions: summary.series.map((d) => (d.hasData ? d.Impressions ?? null : null)),
+    ProfileVisits: summary.series.map((d) => (d.hasData ? d.ProfileVisits ?? null : null)),
+    netFollows: summary.series.map((d) => (d.hasData ? derived(d).netFollows : null)),
+    engagementRate: summary.series.map((d) => (d.hasData && d.Impressions ? derived(d).engagementRate : null))
   };
   return `<div class="a-kpis">${summary.kpis
     .map(
@@ -77,13 +76,13 @@ export function kpiTiles(summary) {
 export function trendCards(summary) {
   const days = summary.series.map((d) => d.day);
   const value = (fn) => summary.series.map((d) => (d.hasData ? fn(d) : null));
-  const impressions = value((d) => d.Impressions || 0);
-  const rates = value((d) => (d.Impressions ? (d.Engagements || 0) / d.Impressions : null));
-  const follows = summary.series.map((d) => d.Follows || 0);
-  const unfollows = summary.series.map((d) => d.Unfollows || 0);
+  const impressions = value((d) => d.Impressions ?? null);
+  const rates = value((d) => (d.Impressions ? derived(d).engagementRate : null));
+  const follows = summary.series.map((d) => d.Follows ?? null);
+  const unfollows = summary.series.map((d) => d.Unfollows ?? null);
   const table = dataTable(
     ['Day', 'Impressions', 'Engagement rate', 'Follows', 'Unfollows', 'Profile visits'],
-    summary.series.filter((d) => d.hasData).map((d) => [d.day, format(d.Impressions), format(d.Impressions ? (d.Engagements || 0) / d.Impressions : null, 'percent'), format(d.Follows || 0), format(d.Unfollows || 0), format(d.ProfileVisits || 0)])
+    summary.series.filter((d) => d.hasData).map((d) => [d.day, format(d.Impressions), format(d.Impressions ? derived(d).engagementRate : null, 'percent'), format(d.Follows), format(d.Unfollows), format(d.ProfileVisits ?? null)])
   );
   return card(
     'Reach and growth',
@@ -99,20 +98,22 @@ export function trendCards(summary) {
   );
 }
 
-export function funnelCard(totals, derived) {
-  const conversion = derived.followConversion;
-  const note =
-    conversion === null
-      ? 'No profile visits recorded in this period.'
-      : `${format(derived.profileVisitRate, 'percent')} of impressions led to a profile visit, and ${format(conversion, 'percent')} of visits became follows.`;
-  return card('From reach to follows', `${funnelChart(funnel(totals))}<p class="subtle">${esc(note)}</p>`);
+export function funnelCard(totals) {
+  return card('Account activity', `<dl class="a-stats">${[
+    ['Profile visits', metricValue(totals, 'ProfileVisits')],
+    ['New follows', metricValue(totals, 'Follows')],
+    ['Unfollows', metricValue(totals, 'Unfollows')]
+  ].map(([name,value]) => `<div><dt>${name}</dt><dd>${format(value)}</dd></div>`).join('')}</dl>
+  <p class="hint">Separate account totals. XTOC cannot attribute a follow to a profile visit.</p>`);
 }
 
 const SORTS = [
   ['impressions', 'Impressions'],
-  ['multiple', 'Versus usual'],
+  ['multiple', '48-hour comparison'],
   ['engagementRate', 'Engagement rate'],
   ['follows', 'New follows'],
+  ['bookmarks', 'Bookmarks'],
+  ['profileVisits', 'Profile visits'],
   ['date', 'Newest']
 ];
 const KINDS = [
@@ -121,8 +122,8 @@ const KINDS = [
   ['reply', 'Replies']
 ];
 
-export function postsCard(account, posts, { sort, kind, limit }) {
-  const controls = `
+export function postsCard(account, posts, { sort, kind, limit, preview = false }) {
+  const controls = preview ? '' : `
     <div class="a-controls">
       <div class="seg" role="group" aria-label="Show">${KINDS.map(([key, label]) => `<button type="button" class="seg-btn" data-kind="${key}" aria-pressed="${kind === key}">${label}</button>`).join('')}</div>
       <label class="a-sort"><span class="subtle">Sort</span>
@@ -136,24 +137,24 @@ export function postsCard(account, posts, { sort, kind, limit }) {
     .map(
       (post) => `
       <tr data-post="${esc(post.id)}" tabindex="0">
-        <td class="a-post-text"><span class="clamp-2">${esc(post.text || '(no text)')}</span>
+        <td class="a-post-text"><span class="a-post-title" title="${esc(post.text || '(no text)')}">${esc(post.text || '(no text)')}</span>
           <span class="row-meta">${esc(postDate(post.createdAt))}${post.kind === 'reply' ? ` · reply${post.replyTo?.handle ? ` to @${esc(post.replyTo.handle)}` : ''}` : ''}${post.media?.length ? ' · media' : ''}${post.links ? ' · link' : ''}</span></td>
         <td class="num"><span class="a-inline-bar" style="--w:${(post.stats.impressions / max) * 100}%"></span>${esc(format(post.stats.impressions, 'compact'))}</td>
         <td class="num">${esc(format(post.stats.engagementRate, 'percent'))}</td>
-        <td class="num">${esc(format(post.metrics?.Follows || 0))}</td>
-        <td class="num">${post.multiple === null ? '<span class="subtle">–</span>' : `<span class="a-multiple ${post.multiple >= 1.5 ? 'is-high' : post.multiple <= 0.5 ? 'is-low' : ''}">${esc(format(post.multiple, 'multiple'))}</span>`}${post.outlier === 'high' ? ' <span class="badge badge-on" title="Far above your usual range">outlier</span>' : ''}</td>
+        <td class="num">${esc(format(post.metrics?.Bookmarks))}</td><td class="num">${esc(format(post.metrics?.ProfileVisits))}</td><td class="num">${esc(format(post.metrics?.Follows))}</td>
+        <td class="num">${post.multiple === null ? '<span class="subtle">–</span>' : `<span class="a-multiple ${post.multiple >= 1.5 ? 'is-high' : post.multiple <= 0.5 ? 'is-low' : ''}">${esc(format(post.multiple, 'multiple'))}</span>`}</td>
       </tr>`
     )
     .join('');
-  const more = posts.length > limit ? `<button type="button" class="btn btn-secondary btn-sm" data-action="more-posts">Show ${Math.min(25, posts.length - limit)} more</button>` : '';
+  const more = preview ? '<button type="button" class="btn btn-secondary btn-sm" data-section="content">Explore all content</button>' : posts.length > limit ? `<button type="button" class="btn btn-secondary btn-sm" data-action="more-posts">Show ${Math.min(15, posts.length - limit)} more</button>` : '';
   return card(
-    'Posts',
+    preview ? 'Top original posts' : 'Published content',
     `${controls}
-     <div class="table-scroll"><table class="a-table">
-       <thead><tr><th scope="col">Post</th><th scope="col" class="num">Impressions</th><th scope="col" class="num">Eng. rate</th><th scope="col" class="num">Follows</th><th scope="col" class="num" title="Impressions compared with the median of your previous 30 posts of the same kind">Vs usual</th></tr></thead>
+     <div class="table-scroll"><table class="a-table a-post-table">
+       <thead><tr><th scope="col">Post</th><th scope="col" class="num">Impressions</th><th scope="col" class="num">Eng. rate</th><th scope="col" class="num">Bookmarks</th><th scope="col" class="num">Visits</th><th scope="col" class="num">Follows</th><th scope="col" class="num" title="Captured impressions at 48–50 hours, compared with at least 5 prior posts of the same kind at that age">At 48h</th></tr></thead>
        <tbody>${rows}</tbody>
      </table></div>${more}`,
-    { sub: `${posts.length} in this period. “Vs usual” compares impressions with your previous 30 posts of the same kind.` }
+    { sub: `${posts.length} in this period. Captured lifetime totals, not impressions earned during this period. “At 48h” needs matching-age captures of at least 5 earlier posts of the same kind.` }
   );
 }
 
@@ -168,27 +169,27 @@ export function timingCard(account, posts) {
   const metric = heatmapMetric(audienceSource);
   const unit = (METRIC_UNITS[metric] || metric || 'activity').toLowerCase();
   const seenGrid = audienceGrid(audienceSource, metric);
-  const bestPosts = topSlots(postGrid, { minCount: 2 });
+  const bestPosts = topSlots(postGrid, { minCount: 5 });
   const bestAudience = topSlots(seenGrid, { limit: 3 });
   const busiestPosting = topSlots(postGrid.map((row) => row.map((cell) => ({ ...cell, value: cell.count || null }))), { limit: 1 })[0];
   const insight = [];
   if (bestAudience.length) insight.push(`Your audience was most active (${unit}) around ${bestAudience.map(slotText).join(', ')}.`);
   if (busiestPosting) insight.push(`You post most often on ${slotText(busiestPosting)}.`);
-  if (bestPosts.length) insight.push(`Posts published around ${slotText(bestPosts[0])} did best (median ${format(bestPosts[0].value, 'compact')} impressions).`);
+  if (bestPosts.length) insight.push(`Posts published around ${slotText(bestPosts[0])} had the highest observed median (${bestPosts[0].count} posts; ${format(bestPosts[0].value, 'compact')} impressions).`);
   return card(
-    'When it works',
+    'Publishing times',
     `${insight.length ? `<p>${esc(insight.join(' '))}</p>` : ''}
      <div class="a-split">
        <div><h3>Your posts, median impressions</h3>${heatmap(postGrid, { label: 'Post performance', unit: 'impressions' })}</div>
        <div><h3>${esc(`Audience activity, ${unit} per hour`)}</h3>${heatmap(seenGrid, { label: 'Audience activity', unit })}</div>
      </div>`,
-    { sub: 'Local time. Audience activity comes from X’s hourly data for the last four weeks, for the metric selected on X’s Audience page (Likes by default).' }
+    { sub: 'Local time. Observed patterns, not a proven best time to post. Audience activity comes from X’s hourly data for the last four weeks, for the metric selected on X’s Audience page (Likes by default).' }
   );
 }
 
 export function breakdownCard(posts) {
   const dims = breakdown(posts).filter((d) => d.groups.length > 1);
-  if (!dims.length) return card('What works', '<p class="viz-empty">Publish a few more posts to compare formats.</p>');
+  if (!dims.length) return card('Content formats', '<p class="viz-empty">Publish a few more posts to compare formats.</p>');
   const blocks = dims
     .map(
       (dim) => `<div><h3>${esc(dim.label)}</h3>${barList(
@@ -197,11 +198,11 @@ export function breakdownCard(posts) {
       )}</div>`
     )
     .join('');
-  return card('What works', `<div class="a-grid-2">${blocks}</div>`, { sub: 'Median impressions per post. Media, links and length compare original posts only.' });
+  return card('Content formats', `<div class="a-grid-2">${blocks}</div>`, { sub: 'Captured lifetime medians; sample sizes in parentheses. Different post ages and small samples limit comparisons. Media, links and length exclude replies.' });
 }
 
 export function ledgerCard(rows) {
-  if (!rows.length) return card('Replies that pay off', '<p class="viz-empty">No replies to other accounts in this period.</p>');
+  if (!rows.length) return card('Reply performance', '<p class="viz-empty">No replies to other accounts in this period.</p>');
   const body = rows
     .slice(0, 15)
     .map(
@@ -210,18 +211,18 @@ export function ledgerCard(rows) {
         <td><a href="https://x.com/${encodeURIComponent(row.handle)}" target="_blank" rel="noopener noreferrer">@${esc(row.handle)}</a></td>
         <td class="num">${row.replies}</td>
         <td class="a-spark-cell">${sparkline(row.weekly, { width: 48, height: 16 })}<span class="a-trend-word ${row.trend}">${{ up: 'more', down: 'less', flat: 'steady', none: '' }[row.trend]}</span></td>
-        <td class="num">${esc(format(row.impressions, 'compact'))}</td>
+        <td class="num">${esc(format(row.impressions, 'compact'))}<span class="a-sub">${esc(format(row.impressionsPerReply, 'compact'))}/reply</span></td>
         <td class="num">${row.inbound ? esc(format(row.inbound)) : '<span class="subtle">–</span>'}</td>
-        <td class="num" title="${esc(`${format(row.profileVisits)} profile visits`)}">${esc(format(row.follows))}<span class="a-sub">${esc(`${row.followsPerReply.toFixed(2)}/reply`)}</span></td>
+        <td class="num" title="${esc(`${format(row.profileVisits)} profile visits`)}">${esc(format(row.follows))}<span class="a-sub">${esc(`${row.followsPerReply === null ? '–' : row.followsPerReply.toFixed(2)}/reply`)}</span></td>
       </tr>`
     )
     .join('');
   return card(
-    'Replies that pay off',
+    'Reply performance',
     `<div class="table-scroll"><table class="a-table">
       <thead><tr><th scope="col">Account</th><th scope="col" class="num">Replies</th><th scope="col">Last 8 weeks</th><th scope="col" class="num">Impressions</th><th scope="col" class="num" title="Their replies and mentions of you in the same period, from your Mentions timeline">They → you</th><th scope="col" class="num">New follows</th></tr></thead>
       <tbody>${body}</tbody></table></div>`,
-    { sub: 'What your replies to each account earned for you. Self-replies (threads) are excluded.' }
+    { sub: 'Captured lifetime results of replies published in the selected period. Self-replies excluded; the trend separately covers 8 weeks.' }
   );
 }
 
@@ -237,7 +238,7 @@ export function inboundCard(rows, hasData) {
         <td class="num">${row.replies}</td>
         <td class="num">${row.mentions}</td>
         <td class="num">${row.yourReplies || '<span class="subtle">0</span>'}</td>
-        <td>${row.yourReplies ? '' : '<span class="badge">not answered</span>'}</td>
+        <td>${row.yourReplies ? '' : '<span class="subtle">No outgoing reply captured</span>'}</td>
       </tr>`
     )
     .join('');
@@ -246,7 +247,7 @@ export function inboundCard(rows, hasData) {
     `<div class="table-scroll"><table class="a-table">
       <thead><tr><th scope="col">Account</th><th scope="col" class="num">Replies to you</th><th scope="col" class="num">Mentions</th><th scope="col" class="num">Your replies</th><th scope="col"><span class="visually-hidden">Status</span></th></tr></thead>
       <tbody>${body}</tbody></table></div>`,
-    { sub: 'From your Mentions timeline at each sync, so older activity may be missing. “Your replies” counts your replies to them in the same period.' }
+    { sub: 'From captured Mentions only; older activity may be missing. Outgoing counts do not establish whether a specific message was answered. “Your replies” counts your replies to them in the same period.' }
   );
 }
 
@@ -350,18 +351,18 @@ export function postDrawer(account, post, detail = null) {
   const curve = growthCurve(post);
   const life = halfLife(post);
   const stats = [
-    ['Impressions', format(m.Impressions || 0)],
-    ['Engagements', format(m.Engagements || 0)],
+    ['Impressions', format(m.Impressions)],
+    ['Engagements', format(m.Engagements)],
     ['Engagement rate', format(post.stats?.engagementRate ?? null, 'percent')],
-    ['Likes', format(m.Likes || 0)],
-    ['Replies', format(m.Replies || 0)],
-    ['Reposts', format(m.Reposts || 0)],
-    ['Bookmarks', format(m.Bookmarks || 0)],
-    ['Shares', format(m.Shares || 0)],
-    ['Profile visits', format(m.ProfileVisits || 0)],
-    ['New follows', format(m.Follows || 0)],
-    ['Link clicks', format(m.UrlClicks || 0)],
-    ['Detail expands', format(m.DetailExpands || 0)]
+    ['Likes', format(m.Likes)],
+    ['Replies', format(m.Replies)],
+    ['Reposts', format(m.Reposts)],
+    ['Bookmarks', format(m.Bookmarks)],
+    ['Shares', format(m.Shares)],
+    ['Profile visits', format(m.ProfileVisits)],
+    ['New follows', format(m.Follows)],
+    ['Link clicks', format(m.UrlClicks)],
+    ['Detail expands', format(m.DetailExpands)]
   ];
   const growth =
     curve.length >= 2
@@ -377,7 +378,7 @@ export function postDrawer(account, post, detail = null) {
     <div class="drawer-body">
       <blockquote class="quote">${esc(post.text || '(no text)')}</blockquote>
       <a class="source" href="${esc(postUrl(account, post))}" target="_blank" rel="noopener noreferrer">${esc(postDate(post.createdAt))} ${icon('external', 13)}</a>
-      ${post.multiple !== null && post.multiple !== undefined ? `<p>${esc(`${format(post.multiple, 'multiple')} the impressions of your usual ${post.kind === 'reply' ? 'reply' : 'post'}.`)}</p>` : ''}
+      ${post.multiple !== null && post.multiple !== undefined ? `<p>${esc(`${format(post.multiple, 'multiple')} the median impressions at 48–50 hours across ${post.baselineCount} earlier ${post.kind === 'reply' ? 'replies' : 'posts'} with matching-age captures.`)}</p>` : ''}
       <dl class="a-stats">${stats.map(([label, value]) => `<div><dt>${esc(label)}</dt><dd>${esc(value)}</dd></div>`).join('')}</dl>
       ${growth}
       ${postDetailBlock(account, post, detail)}
@@ -388,3 +389,25 @@ export const halfLifeNote = (posts) => {
   const value = medianHalfLife(posts);
   return value === null ? '' : `Your posts typically reach half their impressions within ${value < 48 ? `${value.toFixed(1)} hours` : `${(value / 24).toFixed(1)} days`}.`;
 };
+
+export function performanceCard(posts, label = 'Original posts') {
+  const p = contentPerformance(posts);
+  if (!p.measured) return card(label, '<p class="viz-empty">No captured impressions for this group yet.</p>');
+  return card(label, `<dl class="a-performance">
+    <div><dt>Published</dt><dd>${format(p.count)}</dd></div>
+    <div><dt>Median impressions</dt><dd>${format(p.median, 'compact')}</dd></div>
+    <div><dt>Top post share</dt><dd>${format(p.topShare, 'percent')}</dd></div>
+    <div><dt>Average without top post</dt><dd>${format(p.withoutTop, 'compact')}</dd></div>
+  </dl><p class="hint">${p.measured} of ${p.count} posts have captured impressions. Lifetime values; older posts have had more time to accumulate views.</p>`);
+}
+
+export function findingsCard(posts, summary) {
+  const originals = posts.filter(p => p.kind !== 'reply');
+  const p = contentPerformance(originals);
+  const lines = [];
+  if (p.measured >= 5 && p.topShare !== null) lines.push(`${format(p.topShare, 'percent')} of captured original-post impressions came from one post. Compare the median (${format(p.median)}) with that top result before repeating its format.`);
+  if (originals.length) lines.push(`${originals.length} original posts and ${posts.length-originals.length} replies were published in the selected window. Review them separately: they reach different audiences.`);
+  if (!summary.comparable) lines.push('A period-on-period growth comparison is not available yet. Import daily overview data for both periods to make it comparable.');
+  if (!lines.length) lines.push('Review content by bookmarks, profile visits or follows to match the outcome you care about.');
+  return card('What to look at', `<ul class="a-lines">${lines.slice(0,3).map(l=>`<li>${esc(l)}</li>`).join('')}</ul>`, {sub:'Computed from captured data. Patterns are observations, not causal explanations.'});
+}

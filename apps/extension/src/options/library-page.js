@@ -88,6 +88,8 @@ function renderCounts() {
 
 function render() {
   const route = currentRoute();
+  main.classList.toggle('main-analytics', route === 'analytics');
+  document.body.classList.toggle('analytics-active', route === 'analytics');
   document.querySelectorAll('[data-route]').forEach((link) => {
     const active = link.dataset.route === route;
     link.classList.toggle('active', active);
