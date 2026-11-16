@@ -65,13 +65,10 @@ export function createAnalyticsView(ctx) {
 
   function syncLine(sync) {
     const q = sync.accounts?.[view.accountId] || sync.accounts?.pending || {};
-    const checked = Object.keys(q.windows || {}).length;
     const pending = q.pending?.length || 0;
-    const partial = Object.values(q.windows || {}).filter(w => w.status === 'partial' || w.status === 'unavailable').length;
     const status = sync.running ? 'Syncing in an inactive tab' : q.paused ? 'Sync paused' : pending ? 'History sync queued' : 'Sync idle';
     const freshness = q.lastCaptureAt ? `Last capture ${relative(new Date(q.lastCaptureAt).toISOString())}` : sync.lastSuccessAt ? `Last capture ${relative(sync.lastSuccessAt)}` : 'No captures yet';
     return `<p class="a-sync" role="status">${esc(status)} · ${esc(freshness)}${loaded.prefs.mode === 'background' ? ' · updates every 6 hours' : ''}</p>
-      ${checked || pending ? `<p class="hint a-sync-detail">${checked} windows checked · ${pending} queued${partial ? ` · ${partial} with gaps or limits` : ''}. Checked windows do not imply complete metrics.</p>` : ''}
       ${q.error || sync.error ? `<p class="a-sync is-error">${esc(q.error || sync.error)}</p>` : ''}`;
   }
 
@@ -93,11 +90,11 @@ export function createAnalyticsView(ctx) {
           <div class="inline-actions">
             ${accounts.length ? `<div class="segment" role="group" aria-label="Period">${PERIODS.map((d) => `<button type="button" class="seg-btn" data-days="${d}" aria-pressed="${view.days === d}">${d}D</button>`).join('')}</div>` : ''}
             ${accounts.length ? `<button type="button" class="btn btn-secondary" data-action="digest">${icon('download')}Digest</button>` : ''}
-            <button type="button" class="btn btn-secondary" data-action="pause-sync">Pause sync</button>
+            ${running ? '<button type="button" class="btn btn-secondary" data-action="pause-sync">Pause sync</button>' : ''}
             <button type="button" class="btn btn-primary" data-action="sync"${running ? ' disabled' : ''}>${running ? 'Syncing…' : 'Sync from X'}</button>
           </div>
         </header>
-        <div class="a-sync-wrap">${syncLine(loaded.sync)}</div>
+        <div class="a-sync-wrap">${syncLine(loaded.sync)}<a class="data-link" href="#data" data-route="data">Data &amp; sync ${icon('arrow')}</a></div>
       </div>`;
   }
 
@@ -107,7 +104,7 @@ export function createAnalyticsView(ctx) {
       'See your X Analytics, explained',
       'Requires X Premium. Sync opens X Analytics in a background tab of this browser, where you are signed in, and keeps a copy on this device. Sync uploads nothing.'
     )}
-      <p class="hint a-empty-note">Sync checks history in date windows, prioritizing the last 56 daily totals. It continues in small batches until complete or paused. Enable updates every 6 hours in Settings to keep recent data fresh.</p>`;
+      <p class="hint a-empty-note">Sync checks history in date windows, prioritizing the last 56 daily totals. It continues in small batches until complete or paused. Enable updates every 6 hours in Data & Sync to keep recent data fresh.</p>`;
   }
 
   function render() {
@@ -130,7 +127,7 @@ export function createAnalyticsView(ctx) {
     const originals = posts.filter(p => p.kind !== 'reply');
     const replies = posts.filter(p => p.kind === 'reply');
     const content = view.section === 'overview'
-      ? `${kpiTiles(s)}<div class="a-overview-grid">${trendCards(s)}<div class="a-side">${findingsCard(posts, s)}${funnelCard(s.current)}</div></div>${performanceCard(originals)}${postsCard(account, sortPosts(originals), { ...view, limit: 5, preview: true })}${aiCard(view.ai, ctx.ai?.configured)}`
+      ? `${kpiTiles(s)}<div class="a-overview-grid">${trendCards(s)}<div class="a-side">${findingsCard(posts, s)}${funnelCard(s.current)}</div></div>${aiCard(view.ai, ctx.ai?.configured)}`
       : view.section === 'content'
         ? `<div class="a-grid-2">${performanceCard(originals)}${performanceCard(replies, 'Replies')}</div>${postsCard(account, shown, view)}${breakdownCard(posts)}`
         : view.section === 'interactions'
@@ -139,11 +136,10 @@ export function createAnalyticsView(ctx) {
     main.innerHTML = `
       ${header(accounts)}
       <div class="a-page">
-        <nav class="a-tabs" aria-label="Analytics sections">${SECTIONS.map(([key,label]) => `<button type="button" data-section="${key}" aria-current="${view.section === key ? 'page' : 'false'}">${label}</button>`).join('')}</nav>
+        <nav class="tabs a-tabs" aria-label="Analytics sections">${SECTIONS.map(([key,label]) => `<button type="button" data-section="${key}" aria-current="${view.section === key ? 'page' : 'false'}">${label}</button>`).join('')}</nav>
         <div class="a-period"><strong>${esc(s.start)} – ${esc(s.end)} · UTC</strong><span>${view.section === 'audience' ? 'Audience: latest captured X snapshot; its range is set on X.' : 'Complete days. Posts: captured lifetime results of content published in this window.'}</span></div>
         ${view.section === 'overview' ? coverageNote(s) : ''}
         ${content}
-        <p class="hint"><a href="#data">Manage account data, CSV imports and sync</a></p>
       </div>`;
     attachChartHover(main);
     if (focusSelector) main.querySelector(focusSelector)?.focus({ preventScroll: true });

@@ -1,3 +1,4 @@
+import { libraryTabs } from './ui.js';
 import { bookmarkList } from '../library/model.js';
 import { bookmarkFiles, zipFiles } from '../library/obsidian.js';
 import { normalizeClipTags, splitClipTagInput } from '../library/tags.js';
@@ -339,12 +340,13 @@ export function createBookmarksView(ctx) {
       main.innerHTML = `
         <div class="page-top">
         <header class="page-head">
-          <div class="page-title"><h1>Bookmarks</h1><span class="subtle" id="subtitle"></span></div>
+          <div class="page-title"><h1>Library</h1><span class="subtle" id="subtitle"></span></div>
           <div class="inline-actions">
             <button class="btn btn-secondary" type="button" data-action="import">${icon('import')}Import from X</button>
             <button class="btn btn-primary" type="button" data-action="export">${icon('download')}<span id="exportLabel">Export</span></button>
           </div>
         </header>
+        ${libraryTabs('bookmarks')}
         <div class="toolbar">
           <input class="check" type="checkbox" id="selectAll" aria-label="Select all visible bookmarks">
           <div class="toolbar-filters"><div id="search"></div><div id="tagFilter"></div></div>

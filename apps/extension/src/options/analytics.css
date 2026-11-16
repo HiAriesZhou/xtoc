@@ -154,9 +154,6 @@
 
 /* Analytics uses the available workspace; detail panels overlay without reflow. */
 .main.main-analytics { max-width: 1480px; min-width: 0; padding-inline: var(--xtoc-space-8); }
-.a-tabs { display: flex; gap: var(--xtoc-space-6); border-bottom: 1px solid var(--xtoc-border); }
-.a-tabs button { background: none; border: 0; border-bottom: 2px solid transparent; padding: 10px 0; color: var(--xtoc-text-muted); font-weight: 600; cursor: pointer; }
-.a-tabs button[aria-current='page'] { color: var(--xtoc-text); border-bottom-color: var(--xtoc-accent); }
 .a-period { display: grid; gap: 3px; font-size: var(--xtoc-text-xs); color: var(--xtoc-text-muted); }
 .a-period strong { color: var(--xtoc-text); font-weight: 600; }
 .a-coverage { padding: var(--xtoc-space-3) var(--xtoc-space-4); background: var(--xtoc-surface-muted); border-radius: var(--xtoc-radius-control); margin: 0; }
@@ -178,7 +175,6 @@
 .a-data-details { margin-top: var(--xtoc-space-2); }
 .a-data-details > summary { cursor: pointer; color: var(--xtoc-text-muted); padding: var(--xtoc-space-3) 0; }
 .a-kpi-value { font-variant-numeric: tabular-nums; }
-.analytics-active #drawer { box-shadow: var(--xtoc-shadow); }
 
 @media (max-width: 1100px) {
   .a-overview-grid { grid-template-columns: 1fr; }
@@ -187,8 +183,11 @@
 @media (max-width: 720px) {
   .main.main-analytics { padding-inline: var(--xtoc-space-4); }
   .main-analytics .page-head { flex-wrap: wrap; gap: var(--xtoc-space-3); }
-  .a-tabs { gap: 18px; overflow-x: auto; }
-  .a-tabs button { white-space: nowrap; }
   .a-performance { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .a-side { grid-template-columns: 1fr; }
 }
+
+.a-sync-wrap { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--xtoc-space-2); }
+.a-sync-wrap .a-sync { margin: 0 0 var(--xtoc-space-3); }
+.data-link { display: inline-flex; align-items: center; gap: var(--xtoc-space-2); margin-bottom: var(--xtoc-space-3); font-size: var(--xtoc-text-sm); }
+.a-sync-wrap .is-error { flex-basis: 100%; }

@@ -109,3 +109,8 @@ export function download(name, content, type) {
 }
 
 export const today = () => new Date().toISOString().slice(0, 10);
+
+// Local Library navigation, shared by both list views.
+export function libraryTabs(active) {
+  return `<nav class="tabs library-tabs" aria-label="Library sections">${[['bookmarks','Bookmarks'],['clips','Clips']].map(([route,label]) => `<a href="#${route}" data-route="${route}" ${route === active ? 'aria-current="page"' : ''}>${label}<span class="nav-count" id="count-${route}"></span></a>`).join('')}</nav>`;
+}

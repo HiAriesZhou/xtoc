@@ -30,14 +30,15 @@
 .input {
   width: 100%;
   min-height: var(--xtoc-control-md);
-  padding: var(--xtoc-space-2) var(--xtoc-space-3);
+  height: var(--xtoc-control-md);
+  padding: 0 var(--xtoc-space-3);
   border: 1px solid var(--xtoc-border);
   border-radius: var(--xtoc-radius-control);
   background: var(--xtoc-surface);
   
 }
 .input:focus { border-color: var(--xtoc-accent); }
-textarea.input { resize: vertical; line-height: 1.5; }
+textarea.input { height: auto; padding-block: var(--xtoc-space-2); resize: vertical; line-height: 1.5; }
 .check { width: 16px; height: 16px; margin: 0; accent-color: var(--xtoc-accent); cursor: pointer; }
 
 .field { display: grid; gap: var(--xtoc-space-2); }
@@ -153,7 +154,7 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .dropdown-option span:last-child { overflow: hidden; text-overflow: ellipsis; }
 .dropdown-option.is-active { background: var(--xtoc-surface-muted); }
 .dropdown-option[aria-selected='true'] { color: var(--xtoc-accent); font-weight: 600; }
-.dropdown-check { display: inline-flex; width: 14px; visibility: hidden; }
+.dropdown-check { display: inline-flex; width: var(--xtoc-icon-sm); visibility: hidden; }
 .dropdown-option[aria-selected='true'] .dropdown-check { visibility: visible; }
 
 

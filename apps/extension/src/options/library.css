@@ -1,40 +1,21 @@
-/* Layout */
-.app { display: grid; grid-template-columns: 220px minmax(0, 1fr); min-height: 100vh; }
-
-.sidebar {
-  position: sticky;
-  top: 0;
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  padding: var(--xtoc-space-5) var(--xtoc-space-3);
-  border-right: 1px solid var(--xtoc-border);
-  background: var(--xtoc-surface);
-}
-.nav { display: grid; gap: 2px; }
-.nav a {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 9px 10px;
-  border-radius: var(--xtoc-radius-control);
-  color: var(--xtoc-text-muted);
-  font-weight: 600;
-  text-decoration: none;
-}
-.nav a:hover { background: var(--xtoc-surface-muted); color: var(--xtoc-text); }
-.nav a.active { background: var(--xtoc-accent-tint); color: var(--xtoc-accent); }
-.nav-count { margin-left: auto; font-size: var(--xtoc-text-xs); font-weight: 600; }
-.star { margin-top: auto; padding: 10px; color: var(--xtoc-text-muted); font-size: var(--xtoc-text-xs); }
-.star:hover { color: var(--xtoc-accent); text-decoration: none; }
-
-.main { width: 100%; max-width: 880px; padding: 0 var(--xtoc-space-8) var(--xtoc-space-12); }
-/* The list keeps a fixed position and width: the drawer floats above it, so
-   opening or closing details never reflows or shifts the list. */
-@media (min-width: 1100px) {
-  /* Leave room for the 400px drawer (plus scrollbar) so it never covers the list. */
-  .main { max-width: min(880px, calc(100vw - 236px - 400px)); }
-}
+/* Shared page shell: one global navigation and one local classification. */
+.global-nav { display: flex; align-items: center; gap: var(--xtoc-space-8); min-height: 64px; padding: var(--xtoc-space-3) var(--xtoc-space-8); border-bottom: 1px solid var(--xtoc-border); background: var(--xtoc-surface); }
+.global-nav nav { display: flex; gap: var(--xtoc-space-2); }
+.global-nav :is(nav a, .settings-link) { display: inline-flex; align-items: center; gap: var(--xtoc-space-2); min-height: var(--xtoc-control-md); padding: 0 var(--xtoc-space-3); border-radius: var(--xtoc-radius-control); color: var(--xtoc-text-muted); font-weight: 600; text-decoration: none; }
+.global-nav :is(nav a, .settings-link):hover { background: var(--xtoc-surface-muted); color: var(--xtoc-text); }
+.global-nav [aria-current='page'] { color: var(--xtoc-accent); background: var(--xtoc-accent-tint); }
+.settings-link { margin-left: auto; }
+.app { max-width: 1440px; margin-inline: auto; min-height: calc(100vh - 64px); }
+.main { width: 100%; max-width: 880px; min-width: 0; padding: var(--xtoc-space-6) var(--xtoc-space-8) var(--xtoc-space-12); margin-inline: auto; }
+.main-library { max-width: 960px; margin-inline: 0; }
+/* Reserve the drawer space at desktop sizes, so opening it never shifts rows. */
+@media (min-width: 1100px) { .main-library { max-width: min(960px, calc(100vw - 420px)); } }
+.nav-count { color: var(--xtoc-text-muted); font-size: var(--xtoc-text-xs); font-variant-numeric: tabular-nums; }
+.library-tabs { margin-bottom: var(--xtoc-space-4); }
+.back-link { display: inline-flex; align-items: center; gap: var(--xtoc-space-2); margin-bottom: var(--xtoc-space-4); font-size: var(--xtoc-text-sm); }
+.back-link .icon { transform: rotate(180deg); }
+.skip-link { position: fixed; top: -100px; left: 16px; z-index: 100; padding: 8px 16px; background: var(--xtoc-surface); }
+.skip-link:focus { top: 8px; }
 
 /* Page header and toolbar */
 .page-top {
@@ -42,10 +23,10 @@
   top: 0;
   z-index: 15;
   margin: 0 -32px var(--xtoc-space-3);
-  padding: var(--xtoc-space-4) var(--xtoc-space-8) 0;
+  padding: 0 var(--xtoc-space-8);
   background: var(--xtoc-canvas);
 }
-.page-top.is-stuck { box-shadow: 0 1px 0 var(--xtoc-border), 0 6px 12px -10px rgb(15 20 25 / 0.25); }
+.page-top.is-stuck { box-shadow: 0 1px 0 var(--xtoc-border); }
 .page-head { display: flex; align-items: center; justify-content: space-between; gap: var(--xtoc-space-4); margin-bottom: var(--xtoc-space-3); }
 .page-title { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
 .page-head h1 { font-size: var(--xtoc-text-title); font-weight: 800; letter-spacing: -0.2px; }
@@ -60,7 +41,7 @@
   flex: 1;
   align-items: center;
   gap: var(--xtoc-space-2);
-  height: 38px;
+  height: var(--xtoc-control-md);
   padding: 0 6px 0 var(--xtoc-space-3);
   border: 1px solid var(--xtoc-border);
   border-radius: var(--xtoc-radius-control);
@@ -77,7 +58,7 @@
   flex: 1;
   align-items: center;
   gap: var(--xtoc-space-2);
-  height: 38px;
+  height: var(--xtoc-control-md);
   padding: 0 var(--xtoc-space-1) 0 14px;
   border-radius: var(--xtoc-radius-control);
   background: var(--xtoc-accent-tint);
@@ -185,11 +166,6 @@
 
 @media (max-width: 720px) {
   .app { display: block; }
-  .sidebar { position: static; flex-direction: row; align-items: center; height: auto; padding: 10px var(--xtoc-space-4); border-right: 0; border-bottom: 1px solid var(--xtoc-border); }
-  .brand { padding: 0 var(--xtoc-space-3) 0 0; font-size: var(--xtoc-text-lg); }
-  .nav { display: flex; }
-  .nav a span:not(.nav-count) { display: none; }
-  .star { display: none; }
   .main { padding: 0 var(--xtoc-space-4) var(--xtoc-space-10); }
   .page-top { margin: 0 -16px var(--xtoc-space-3); padding: var(--xtoc-space-3) var(--xtoc-space-4) 0; }
   .page-head { flex-wrap: wrap; align-items: flex-start; }
@@ -205,11 +181,11 @@
 .sync-preference small { display: block; margin-top: var(--xtoc-space-1); color: var(--xtoc-text-muted); font-size: var(--xtoc-text-xs); font-weight: 400; }
 .sync-preference select { width: 100%; max-width: 380px; }
 
-.global-nav { display:flex; align-items:center; gap:var(--xtoc-space-8); padding:var(--xtoc-space-3) var(--xtoc-space-6); border-bottom:1px solid var(--xtoc-border); background:var(--xtoc-surface); }
-.global-nav .brand { padding:0; color:var(--xtoc-text); }
-.global-nav nav { display:flex; gap:var(--xtoc-space-2); }
-.global-nav nav a { padding:var(--xtoc-space-2) var(--xtoc-space-3); color:var(--xtoc-text-muted); border-radius:7px; font-weight:600; }
-.global-nav nav a[aria-current] { color:var(--xtoc-accent); background:var(--xtoc-accent-tint); }
-.app { min-height:calc(100vh - 65px); }
-.sidebar { top:0; height:auto; min-height:100%; padding-top:24px; }
-@media(max-width:640px) { .global-nav { padding:var(--xtoc-space-3); gap:var(--xtoc-space-3); flex-wrap:wrap; } .global-nav nav { gap:0; } .global-nav nav a { padding:var(--xtoc-space-2); } }
+@media (max-width: 720px) {
+  .main { padding-top: var(--xtoc-space-4); }
+  .global-nav { gap: var(--xtoc-space-3); padding-inline: var(--xtoc-space-4); }
+  .global-nav :is(nav a, .settings-link) { padding-inline: var(--xtoc-space-2); }
+  .global-nav .brand { font-size: var(--xtoc-text-lg); gap: var(--xtoc-space-1); }
+  .settings-link span { display: none; }
+  .settings-link { min-width: var(--xtoc-control-md); justify-content: center; }
+}

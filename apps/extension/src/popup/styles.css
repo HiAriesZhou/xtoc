@@ -40,5 +40,5 @@ body { overflow-x: hidden; background: var(--xtoc-surface); }
 .sync-actions { display: flex; gap: var(--xtoc-space-2); }
 .sync-actions .btn { flex: 1; }
 .sync-more, .sync-hint { margin-top: var(--xtoc-space-2); color: var(--xtoc-text-muted); font-size: var(--xtoc-text-xs); }
-.popup-nav { display: flex; gap: var(--xtoc-space-2); padding-top: var(--xtoc-space-3); }
-.popup-nav .btn { flex: 1; }
+
+.section-meta { color: var(--xtoc-text-muted); font-size: var(--xtoc-text-xs); margin-bottom: var(--xtoc-space-2); }

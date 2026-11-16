@@ -25,18 +25,24 @@ function brandIconUrl() {
   return path ? chrome.runtime.getURL(path) : '';
 }
 
+function entryLink(page, label) {
+  return `<a class="section-link" href="../${page}/index.html" data-page="${page}">${label}${icon('arrow')}</a>`;
+}
 function renderHeader() {
-  return `<header class="header"><div class="brand"><img src="${brandIconUrl()}" alt="" width="20" height="20">XTOC</div><button class="btn btn-secondary btn-sm" data-page="settings">Settings</button></header><nav class="popup-nav" aria-label="XTOC"><button class="btn btn-secondary" data-page="library">Library</button><button class="btn btn-secondary" data-page="analytics">Analytics</button></nav>`;
+  return `<header class="header"><div class="brand"><img src="${brandIconUrl()}" alt="" width="24" height="24">XTOC</div><a class="icon-btn" href="../settings/index.html" data-page="settings" aria-label="Settings" title="Settings">${icon('settings')}</a></header>`;
+}
+function summaryFallback(message) {
+  return `<section class="home-section">${entryLink('library', 'Library')}</section><section class="home-section">${entryLink('analytics', 'Analytics')}<p class="muted-line" role="status">${message}</p></section>`;
 }
 let snapshot = null;
 function safeLink(value) { try { const url = new URL(value); return ['https:', 'http:'].includes(url.protocol) ? escapeHtml(url.href) : ''; } catch { return ''; } }
 function homeSummary() {
-  if (!snapshot) return '<p class="muted-line" role="status">Loading local summary…</p>';
+  if (!snapshot) return summaryFallback('Loading local summary…');
   const d = snapshot, stats = d.stats;
   const account = d.accounts.find(a => a.id === d.accountId);
   const num = value => value === null ? '–' : new Intl.NumberFormat('en', { notation:'compact', maximumFractionDigits:1 }).format(value);
   const metrics = stats ? `<p class="summary-period">Last 7 complete days · UTC · ${stats.coverage}/7 days captured${stats.coverage < 7 ? ' · totals for captured days' : ''}</p><div class="summary-kpis">${stats.kpis.map(k => `<div><span>${escapeHtml(k.label)}</span><strong>${k.format === 'percent' && k.value !== null ? (k.value * 100).toFixed(2) + '%' : num(k.value)}</strong></div>`).join('')}</div>` : '<p class="muted-line">Connect your own X Premium analytics to see account performance.</p>';
-  return `<section class="home-section"><button class="section-link" data-page="library">My library <span>${d.bookmarks} bookmarks · ${d.clips} clips</span></button>${d.recent.length ? d.recent.map(item => `<a class="recent-item" href="${safeLink(item.url)}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(item.title)}"><small>${item.kind}</small><span>${escapeHtml(item.title || 'Untitled')}</span></a>`).join('') : '<p class="muted-line">Save an X post or select a passage to start your library.</p>'}</section><section class="home-section"><button class="section-link" data-page="analytics">Analytics <span>${account ? '@' + escapeHtml(account.handle || account.id) : 'Open analytics'}</span></button>${d.accounts.length > 1 ? `<select class="input" aria-label="Analytics account" id="summary-account">${d.accounts.map(a => `<option value="${a.id}" ${a.id === d.accountId ? 'selected' : ''}>@${escapeHtml(a.handle || a.id)}</option>`).join('')}</select>` : ''}${metrics}<p class="summary-period">${d.sync.running ? 'Syncing in an inactive tab' : d.sync.paused ? 'Sync paused' : d.sync.queued ? 'History queued: ' + d.sync.queued + ' windows' : d.sync.mode === 'background' ? 'Updates every 6 hours' : 'Manual / on-visit updates'}${d.sync.capturedAt ? ' · Last capture ' + new Date(d.sync.capturedAt).toLocaleString() : ''}</p>${d.sync.error ? `<p class="summary-error">${escapeHtml(d.sync.error)}</p>` : ''}<button class="btn btn-secondary btn-sm" data-page="analytics" data-route="data">Data & Sync</button></section>`;
+  return `<section class="home-section">${entryLink('library', 'Library')}<p class="section-meta">${d.bookmarks} bookmarks · ${d.clips} clips</p>${d.recent.length ? d.recent.map(item => `<a class="recent-item" href="${safeLink(item.url)}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(item.title)}"><small>${item.kind}</small><span>${escapeHtml(item.title || 'Untitled')}</span></a>`).join('') : '<p class="muted-line">Save an X post or select a passage to start your library.</p>'}</section><section class="home-section">${entryLink('analytics', 'Analytics')}${d.accounts.length === 1 ? `<p class="section-meta">@${escapeHtml(account.handle || account.id)}</p>` : ''}${d.accounts.length > 1 ? `<select class="input" aria-label="Analytics account" id="summary-account">${d.accounts.map(a => `<option value="${a.id}" ${a.id === d.accountId ? 'selected' : ''}>@${escapeHtml(a.handle || a.id)}</option>`).join('')}</select>` : ''}${metrics}<p class="summary-period">${d.sync.running ? 'Syncing in an inactive tab' : d.sync.paused ? 'Sync paused' : d.sync.queued ? 'History queued: ' + d.sync.queued + ' windows' : d.sync.mode === 'background' ? 'Updates every 6 hours' : 'Manual / on-visit updates'}${d.sync.capturedAt ? ' · Last capture ' + new Date(d.sync.capturedAt).toLocaleString() : ''}</p>${d.sync.error ? `<p class="summary-error">${escapeHtml(d.sync.error)}</p>` : ''}</section>`;
 }
 
 // Bookmarks pages: import controls instead of the "no article" notice.
@@ -141,7 +147,8 @@ function bindSave(button, tabId) {
 function bindActions(root, page, tabId) {
   root.addEventListener('click', async event => {
     const button = event.target.closest('[data-page]');
-    if (!button) return;
+    if (!button || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
     const result = await chrome.runtime.sendMessage({ action: 'app:open', payload: { page:button.dataset.page, route:button.dataset.route, accountId:snapshot?.accountId } });
     if (result?.ok) window.close();
   });
@@ -207,5 +214,5 @@ async function loadSummary(root, accountId) {
     const result = await chrome.runtime.sendMessage({ action:'popup:summary', payload:{accountId} });
     if (!result?.ok) throw Error(result?.error || 'Local summary unavailable.');
     snapshot = result.data; target.innerHTML = homeSummary();
-  } catch { target.innerHTML = '<p class="muted-line">Local summary unavailable. Open Library or Analytics to continue.</p>'; }
+  } catch { target.innerHTML = summaryFallback('Local summary unavailable. Open a page to continue.'); }
 }
