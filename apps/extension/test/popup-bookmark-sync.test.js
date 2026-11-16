@@ -37,3 +37,13 @@ test('finished imports can run again, or continue after reaching the per-run lim
 test('unknown commands from a page are never rendered', () => {
   assert.deepEqual(syncView(status('idle', ['start', 'deleteEverything'])).buttons.map((b) => b.command), ['start']);
 });
+
+test('every bookmark import command has a drawable shared icon', async () => {
+  const { icon } = await import('../src/ui/icons.js');
+  for (const phase of ['idle', 'running', 'paused', 'done']) {
+    const view = syncView(status(phase, ['start','continue','resume','pause','stop','full']));
+    for (const button of view.buttons.filter(button => button.icon)) {
+      assert.match(icon(button.icon), /<(path|rect|circle)\b/, `${button.command} needs a drawn icon`);
+    }
+  }
+});

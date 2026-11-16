@@ -1,5 +1,7 @@
 // One icon vocabulary for extension pages and popup.
 const ICON_PATHS = {
+  play: '<path d="M7 4v16l13-8z"/>',
+  stop: '<rect x="6" y="6" width="12" height="12" rx="2"/>',
   error: '<circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/>',
   pause: '<rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/>',
   arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
