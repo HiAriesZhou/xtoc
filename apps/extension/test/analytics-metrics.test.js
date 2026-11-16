@@ -79,7 +79,7 @@ test('summary reports no values when there is no data, not zeros', () => {
 
 test('derived ratios and funnel guard against division by zero', () => {
   assert.equal(derived({}).engagementRate, null);
-  assert.equal(derived({ Impressions: 1000, Follows: 5, ProfileVisits: 50 }).followConversion, 0.1);
+  assert.equal(derived({ Impressions: 1000, Follows: 5, ProfileVisits: 50 }).profileVisitRate, 0.05);
   const steps = funnel({ Impressions: 1000, ProfileVisits: 50, Follows: 5 });
   assert.deepEqual(steps.map((s) => s.stepRate), [null, 0.05, 0.1]);
 });
@@ -87,7 +87,8 @@ test('derived ratios and funnel guard against division by zero', () => {
 test('postList scores posts against the author’s own previous posts of the same kind', () => {
   const posts = {};
   for (let i = 0; i < 8; i++) posts[i] = post(String(i), today - (10 - i) * DAY, 100);
-  posts.big = post('big', today - DAY, 1000);
+  posts.big = post('big', today - 3 * DAY, 1000);
+  for (const p of Object.values(posts)) p.snapshots = [[p.createdAt + 2 * DAY, p.metrics.Impressions]];
   const list = postList({ posts }, { days: 30, today });
   const big = list.find((p) => p.id === 'big');
   assert.equal(big.baseline, 100);
@@ -167,7 +168,7 @@ test('digest and Markdown summarize the period without inventing data', () => {
   const account = { handle: 'example', daily, posts: { 1: post('1', today - DAY, 700) } };
   const d = digest(account, { days: 7, today });
   assert.ok(d.lines[0].startsWith('Impressions: 700'));
-  assert.ok(d.lines.some((line) => line.includes('25.0% of profile visits')));
+  assert.ok(d.lines.some((line) => line.includes('do not track a visitor-to-follower path')));
   const md = digestMarkdown(account, { days: 7, today });
   assert.match(md, /^---\ntitle: "@example analytics 2026-10-19 – 2026-10-25"/);
   assert.match(md, /\| Impressions \| 700 \| 0% \|/);

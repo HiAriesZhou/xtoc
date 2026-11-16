@@ -8,7 +8,7 @@ const MIN_BASELINE = 5;
 const OUTLIER_Z = 3.5;
 
 export const sum = (values) => values.reduce((total, value) => total + (value || 0), 0);
-export const rate = (part, whole) => (whole > 0 ? part / whole : null);
+export const rate = (part, whole) => (Number.isFinite(part) && Number.isFinite(whole) && whole > 0 ? part / whole : null);
 
 export function median(values) {
   const sorted = values.filter(Number.isFinite).sort((a, b) => a - b);
@@ -24,27 +24,40 @@ export function dayRange(end, days) {
 }
 
 export function totals(daily = {}, keys) {
-  const out = { days: 0 };
+  const out = { days: 0, metricDays: {} };
   for (const key of keys) {
     const day = daily[key];
     if (!day) continue;
     out.days++;
-    for (const [name, value] of Object.entries(day)) out[name] = (out[name] || 0) + value;
+    for (const [name, value] of Object.entries(day)) {
+      if (!Number.isFinite(value)) continue;
+      out[name] = (out[name] || 0) + value;
+      out.metricDays[name] = (out.metricDays[name] || 0) + 1;
+    }
   }
   return out;
 }
 
-// Ratios that explain a period: reach → attention → follow.
+// Missing fields remain unknown, including totals whose metric coverage is incomplete.
+export const metricValue = (totals, key) =>
+  totals.metricDays && totals.metricDays[key] !== totals.days ? null : totals[key] ?? null;
+
+export function periodBounds(today, days) {
+  const end = Date.parse(`${dayKey(today)}T00:00:00Z`);
+  return { start: end - days * DAY_MS, end };
+}
+
 export function derived(t) {
-  const impressions = t.Impressions || 0;
+  const value = (key) => metricValue(t, key);
+  const impressions = value('Impressions');
+  const follows = value('Follows'), unfollows = value('Unfollows');
   return {
-    engagementRate: rate(t.Engagements || 0, impressions),
-    profileVisitRate: rate(t.ProfileVisits || 0, impressions),
-    followConversion: rate(t.Follows || 0, t.ProfileVisits || 0),
-    followsPer1k: impressions > 0 ? ((t.Follows || 0) / impressions) * 1000 : null,
-    netFollows: (t.Follows || 0) - (t.Unfollows || 0),
-    bookmarkRate: rate(t.Bookmarks || 0, impressions),
-    replyRate: rate(t.Replies || 0, impressions)
+    engagementRate: rate(value('Engagements'), impressions),
+    profileVisitRate: rate(value('ProfileVisits'), impressions),
+    followsPer1k: rate(follows === null ? null : follows * 1000, impressions),
+    netFollows: follows === null || unfollows === null ? null : follows - unfollows,
+    bookmarkRate: rate(value('Bookmarks'), impressions),
+    replyRate: rate(value('Replies'), impressions)
   };
 }
 
@@ -58,7 +71,7 @@ export const KPI_DEFS = [
   { key: 'ProfileVisits', label: 'Profile visits', format: 'number' }
 ];
 
-const kpiValue = (key, t, d) => (key in d ? d[key] : t.days ? t[key] || 0 : null);
+const kpiValue = (key, t, d) => (key in d ? d[key] : t.days ? metricValue(t, key) : null);
 
 // Periods end with the last complete UTC day, so today's partial numbers do
 // not make the current period look worse than the previous one.
@@ -72,6 +85,9 @@ export function summary(account, { days = 28, today = Date.now() } = {}) {
   const pd = derived(previous);
   return {
     days,
+    start: currentKeys[0],
+    end: currentKeys.at(-1),
+    comparable: current.days === days && previous.days === days,
     coverage: current.days, // days of the period that have data
     current,
     previous,
@@ -80,7 +96,7 @@ export function summary(account, { days = 28, today = Date.now() } = {}) {
     kpis: KPI_DEFS.map((def) => {
       const value = current.days ? kpiValue(def.key, current, cd) : null;
       const before = previous.days ? kpiValue(def.key, previous, pd) : null;
-      return { ...def, value, previous: before, change: change(value, before) };
+      return { ...def, value, previous: before, change: current.days === days && previous.days === days ? change(value, before) : null };
     }),
     series: currentKeys.map((key) => ({ day: key, ...(account.daily?.[key] || {}), hasData: Boolean(account.daily?.[key]) }))
   };
@@ -89,9 +105,9 @@ export function summary(account, { days = 28, today = Date.now() } = {}) {
 // Funnel steps with the share that survives each step.
 export function funnel(t) {
   const steps = [
-    { key: 'Impressions', label: 'Impressions', value: t.Impressions || 0 },
-    { key: 'ProfileVisits', label: 'Profile visits', value: t.ProfileVisits || 0 },
-    { key: 'Follows', label: 'New follows', value: t.Follows || 0 }
+    { key: 'Impressions', label: 'Impressions', value: metricValue(t, 'Impressions') },
+    { key: 'ProfileVisits', label: 'Profile visits', value: metricValue(t, 'ProfileVisits') },
+    { key: 'Follows', label: 'New follows', value: metricValue(t, 'Follows') }
   ];
   return steps.map((step, i) => ({ ...step, stepRate: i ? rate(step.value, steps[i - 1].value) : null }));
 }
@@ -99,12 +115,19 @@ export function funnel(t) {
 export function postStats(post) {
   const m = post.metrics || {};
   return {
-    impressions: m.Impressions || 0,
-    engagementRate: rate(m.Engagements || 0, m.Impressions || 0),
-    followsPer1k: m.Impressions ? ((m.Follows || 0) / m.Impressions) * 1000 : null,
-    profileVisitRate: rate(m.ProfileVisits || 0, m.Impressions || 0),
-    bookmarkRate: rate(m.Bookmarks || 0, m.Impressions || 0)
+    impressions: m.Impressions ?? null,
+    engagementRate: rate(m.Engagements, m.Impressions),
+    followsPer1k: rate(m.Follows === undefined ? null : m.Follows * 1000, m.Impressions),
+    profileVisitRate: rate(m.ProfileVisits, m.Impressions),
+    bookmarkRate: rate(m.Bookmarks, m.Impressions)
   };
+}
+
+// Compare only captures taken 48–50 hours after publication, never lifetime totals.
+export function impressionsAt48h(post) {
+  if (post.dayOnly) return null;
+  const point = (post.snapshots || []).filter(([at, n]) => Number.isFinite(n) && at >= post.createdAt + 2 * DAY_MS && at <= post.createdAt + 2 * DAY_MS + 7200000).sort((a,b) => a[0]-b[0])[0];
+  return point?.[1] ?? null;
 }
 
 const sortedPosts = (account) =>
@@ -116,12 +139,12 @@ function withBaselines(posts) {
   const history = {}; // local per-kind lists, built in time order
   return posts.map((post, i) => {
     const own = (history[post.kind] ||= []);
-    const pool = own.length >= MIN_BASELINE ? own : posts.slice(0, i);
-    const window = pool.slice(-BASELINE_POSTS).map((p) => p.metrics?.Impressions || 0);
+    const window = own.map(impressionsAt48h).filter(Number.isFinite).slice(-BASELINE_POSTS);
     const baseline = window.length >= MIN_BASELINE ? median(window) : null;
     own.push(post);
     const stats = postStats(post);
-    return { ...post, stats, baseline, multiple: baseline ? stats.impressions / baseline : null };
+    const at48h = impressionsAt48h(post);
+    return { ...post, stats, baseline, baselineCount: window.length, at48h, multiple: baseline && at48h !== null ? at48h / baseline : null };
   });
 }
 
@@ -138,16 +161,18 @@ function markOutliers(posts) {
 }
 
 export function postList(account, { days = 28, today = Date.now(), kind = 'all' } = {}) {
-  const since = today - days * DAY_MS;
+  const { start: since, end } = periodBounds(today, days);
   const all = withBaselines(sortedPosts(account));
-  const inRange = all.filter((p) => p.createdAt >= since && (kind === 'all' || p.kind === kind));
+  const inRange = all.filter((p) => p.createdAt >= since && p.createdAt < end && (kind === 'all' || p.kind === kind));
   return markOutliers(inRange).sort((a, b) => b.createdAt - a.createdAt);
 }
 
 const SORTERS = {
   impressions: (p) => p.stats.impressions,
   engagementRate: (p) => p.stats.engagementRate ?? -1,
-  follows: (p) => p.metrics?.Follows || 0,
+  follows: (p) => p.metrics?.Follows ?? -1,
+  bookmarks: (p) => p.metrics?.Bookmarks ?? -1,
+  profileVisits: (p) => p.metrics?.ProfileVisits ?? -1,
   multiple: (p) => p.multiple ?? -1,
   date: (p) => p.createdAt
 };
@@ -157,9 +182,9 @@ export const sortPosts = (posts, by = 'impressions') =>
 
 const groupStats = (posts) => ({
   count: posts.length,
-  medianImpressions: median(posts.map((p) => p.metrics?.Impressions || 0)),
+  medianImpressions: median(posts.map((p) => p.metrics?.Impressions).filter(Number.isFinite)),
   medianEngagementRate: median(posts.map((p) => postStats(p).engagementRate).filter((v) => v !== null)),
-  followsPer1k: rate(sum(posts.map((p) => p.metrics?.Follows || 0)) * 1000, sum(posts.map((p) => p.metrics?.Impressions || 0)))
+  followsPer1k: posts.every(p => Number.isFinite(p.metrics?.Follows) && Number.isFinite(p.metrics?.Impressions)) ? rate(sum(posts.map(p => p.metrics.Follows)) * 1000, sum(posts.map(p => p.metrics.Impressions))) : null
 });
 
 const LENGTH_BUCKETS = [
@@ -236,7 +261,7 @@ const emptyGrid = () => Array.from({ length: 7 }, () => Array.from({ length: 24 
 export function postingGrid(posts, parts = localParts) {
   const grid = emptyGrid();
   for (const post of posts) {
-    if (post.dayOnly) continue; // imported from CSV: no time of day
+    if (post.dayOnly || !Number.isFinite(post.metrics?.Impressions)) continue; // no observation or time of day
     const { day, hour } = parts(post.createdAt);
     grid[day][hour].push(post.metrics?.Impressions || 0);
   }
@@ -275,4 +300,13 @@ export function topSlots(grid, { minCount = 1, limit = 3 } = {}) {
     .filter((cell) => cell.count >= minCount && cell.value !== null)
     .sort((a, b) => b.value - a.value)
     .slice(0, limit);
+}
+
+// Distribution is over captured lifetime impressions of posts published in the window.
+export function contentPerformance(posts) {
+  const known = posts.map(p => p.stats.impressions).filter(Number.isFinite).sort((a,b)=>b-a);
+  const total = sum(known);
+  return { count: posts.length, measured: known.length, total, median: median(known),
+    topShare: rate(known[0], total), topFiveShare: rate(sum(known.slice(0,5)), total),
+    withoutTop: known.length > 1 ? sum(known.slice(1)) / (known.length-1) : null };
 }

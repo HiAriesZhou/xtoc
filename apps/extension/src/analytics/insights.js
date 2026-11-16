@@ -1,7 +1,7 @@
 // Higher-level readings built on metrics.js: who replies pay off with, how
 // fast posts grow, posting cadence, and a plain-language weekly digest.
 import { dayKey } from './parse.js';
-import { DAY_MS, dayRange, derived, median, postList, rate, sum, summary, totals } from './metrics.js';
+import { DAY_MS, periodBounds, dayRange, derived, median, postList, rate, sum, summary, totals } from './metrics.js';
 
 const WEEK_MS = 7 * DAY_MS;
 
@@ -9,45 +9,45 @@ const WEEK_MS = 7 * DAY_MS;
 // earned on the author's side: reach, profile visits and new follows.
 export function interactionLedger(account, { days = 90, today = Date.now(), weeks = 8 } = {}) {
   const own = (account.handle || '').toLowerCase();
-  const since = today - days * DAY_MS;
-  const trendSince = today - weeks * WEEK_MS;
+  const { start: since, end } = periodBounds(today, days);
+  const trendSince = end - weeks * WEEK_MS;
   const rows = new Map();
   for (const post of Object.values(account.posts || {})) {
     const handle = post.replyTo?.handle;
-    if (post.kind !== 'reply' || !handle || handle === own) continue;
+    if (post.kind !== 'reply' || !handle || handle.toLowerCase() === own || post.createdAt >= end) continue;
     if (post.createdAt < Math.min(since, trendSince)) continue;
-    const row = rows.get(handle) || { handle, replies: 0, impressions: 0, engagements: 0, profileVisits: 0, follows: 0, lastAt: 0, weekly: Array(weeks).fill(0) };
+    const row = rows.get(handle) || { handle, replies: 0, impressions: 0, engagements: 0, profileVisits: 0, follows: 0, lastAt: 0, weekly: Array(weeks).fill(0), measured: {} };
     // The weekly trend always covers the last `weeks` weeks; totals cover `days`.
-    const week = weeks - 1 - Math.floor((today - post.createdAt) / WEEK_MS);
+    const week = weeks - 1 - Math.floor((end - 1 - post.createdAt) / WEEK_MS);
     if (week >= 0 && week < weeks) row.weekly[week]++;
     if (post.createdAt >= since) {
       const m = post.metrics || {};
       row.replies++;
-      row.impressions += m.Impressions || 0;
-      row.engagements += m.Engagements || 0;
-      row.profileVisits += m.ProfileVisits || 0;
-      row.follows += m.Follows || 0;
+      for (const [key, source] of Object.entries({impressions:'Impressions', engagements:'Engagements', profileVisits:'ProfileVisits', follows:'Follows'})) {
+        if (Number.isFinite(m[source])) { row[key] += m[source]; row.measured[key] = (row.measured[key] || 0) + 1; }
+      }
       row.lastAt = Math.max(row.lastAt, post.createdAt);
     }
     rows.set(handle, row);
   }
-  const inbound = inboundCounts(account, since);
+  const inbound = inboundCounts(account, since, end);
   return [...rows.values()]
     .filter((row) => row.replies > 0)
+    .map(row => { for (const key of ['impressions','engagements','profileVisits','follows']) if (row.measured[key] !== row.replies) row[key] = null; return row; })
     .map((row) => ({ ...row, inbound: inbound.get(row.handle) || 0 }))
     .map((row) => ({
       ...row,
-      impressionsPerReply: row.impressions / row.replies,
-      followsPerReply: row.follows / row.replies,
+      impressionsPerReply: rate(row.impressions, row.replies),
+      followsPerReply: rate(row.follows, row.replies),
       trend: trendOf(row.weekly)
     }))
     .sort((a, b) => b.impressions - a.impressions);
 }
 
-function inboundCounts(account, since) {
+function inboundCounts(account, since, end) {
   const counts = new Map();
   for (const item of Object.values(account.inbound || {})) {
-    if (item.createdAt >= since) counts.set(item.handle, (counts.get(item.handle) || 0) + 1);
+    if (item.createdAt >= since && item.createdAt < end) counts.set(item.handle, (counts.get(item.handle) || 0) + 1);
   }
   return counts;
 }
@@ -55,11 +55,11 @@ function inboundCounts(account, since) {
 // Who replied to or mentioned the author, next to how often the author
 // replied to them. Comes from the Mentions timeline, so it is recent only.
 export function inboundLedger(account, { days = 90, today = Date.now() } = {}) {
-  const since = today - days * DAY_MS;
+  const { start: since, end } = periodBounds(today, days);
   const own = (account.handle || '').toLowerCase();
   const rows = new Map();
   for (const item of Object.values(account.inbound || {})) {
-    if (item.createdAt < since || item.handle === own) continue;
+    if (item.createdAt < since || item.createdAt >= end || item.handle === own) continue;
     const row = rows.get(item.handle) || { handle: item.handle, inbound: 0, replies: 0, mentions: 0, yourReplies: 0, lastAt: 0 };
     row.inbound++;
     row[item.kind === 'reply' ? 'replies' : 'mentions']++;
@@ -68,7 +68,7 @@ export function inboundLedger(account, { days = 90, today = Date.now() } = {}) {
   }
   for (const post of Object.values(account.posts || {})) {
     const row = rows.get(post.replyTo?.handle);
-    if (row && post.kind === 'reply' && post.createdAt >= since) row.yourReplies++;
+    if (row && post.kind === 'reply' && post.createdAt >= since && post.createdAt < end) row.yourReplies++;
   }
   return [...rows.values()].sort((a, b) => b.inbound - a.inbound || b.lastAt - a.lastAt);
 }
@@ -137,8 +137,8 @@ export function weeklyCadence(account, { weeks = 12, today = Date.now() } = {}) 
 }
 
 const pct = (value) => (value === null ? 'n/a' : `${(value * 100).toFixed(1)}%`);
-const signed = (value) => (value > 0 ? `+${value}` : String(value));
-const fmt = (value) => Math.round(value || 0).toLocaleString('en-US');
+const signed = (value) => (value === null ? 'n/a' : value > 0 ? `+${value}` : String(value));
+const fmt = (value) => value === null || value === undefined ? 'n/a' : Math.round(value).toLocaleString('en-US');
 const changeText = (value) =>
   value === null ? '' : ` (${value >= 0 ? 'up' : 'down'} ${Math.abs(value * 100).toFixed(0)}% from the previous period)`;
 
@@ -152,18 +152,17 @@ export function digest(account, { days = 7, today = Date.now() } = {}) {
     const partial = s.coverage < days ? ` over ${s.coverage} of ${days} days with data` : '';
     lines.push(`Impressions: ${fmt(impressions.value)}${partial}${changeText(impressions.change)}.`);
     lines.push(`Engagement rate: ${pct(engagement.value)}; profile visits: ${fmt(visits.value)}; net follows: ${signed(net.value)}.`);
-    const conversion = s.derived.followConversion;
-    if (conversion !== null) lines.push(`${pct(conversion)} of profile visits turned into follows.`);
+    lines.push('Account totals are separate measurements; they do not track a visitor-to-follower path.');
   }
   const originals = posts.filter((p) => p.kind !== 'reply');
   const best = [...posts].sort((a, b) => b.stats.impressions - a.stats.impressions)[0];
   if (posts.length) lines.push(`You published ${originals.length} posts and ${posts.length - originals.length} replies.`);
   if (best) {
-    const multiple = best.multiple ? `, ${best.multiple.toFixed(1)}× your usual` : '';
-    lines.push(`Top post: ${fmt(best.stats.impressions)} impressions${multiple}.`);
+    const multiple = best.multiple ? `, ${best.multiple.toFixed(1)}× the median of comparable 48-hour captures` : '';
+    lines.push(`Top captured post: ${fmt(best.stats.impressions)} lifetime impressions${multiple}.`);
   }
   const ledger = interactionLedger(account, { days, today });
-  if (ledger[0]) lines.push(`Replies to @${ledger[0].handle} earned the most reach (${fmt(ledger[0].impressions)} impressions from ${ledger[0].replies} replies).`);
+  if (ledger[0]?.impressions !== null && ledger[0]) lines.push(`Replies to @${ledger[0].handle} earned the most reach (${fmt(ledger[0].impressions)} impressions from ${ledger[0].replies} replies).`);
   if (!lines.length) lines.push('No analytics for this period yet. Sync from Analytics to load it.');
   return { days, today, lines, summary: s, best, ledger: ledger.slice(0, 5) };
 }
@@ -210,8 +209,11 @@ export function interpretationInput(account, { days = 28, today = Date.now() } =
   const round = (value) => (value === null ? null : Math.round(value * 10000) / 10000);
   return {
     periodDays: days,
-    totals: Object.fromEntries(Object.entries(s.current).filter(([key]) => key !== 'days')),
-    previousTotals: Object.fromEntries(Object.entries(s.previous).filter(([key]) => key !== 'days')),
+    periodStart: s.start, periodEnd: s.end,
+    coverageDays: s.coverage, comparable: s.comparable,
+    evidenceNotes: ['Daily totals include only observed days. Post metrics are captured lifetime values for posts published in the window. Ratios do not establish attribution.'],
+    totals: Object.fromEntries(Object.entries(s.current).filter(([key]) => key !== 'days' && key !== 'metricDays').map(([key,value]) => [key, s.current.metricDays[key] === s.current.days ? value : null])),
+    previousTotals: s.comparable ? Object.fromEntries(Object.entries(s.previous).filter(([key]) => key !== 'days' && key !== 'metricDays')) : null,
     ratios: Object.fromEntries(Object.entries(derived(s.current)).map(([k, v]) => [k, round(v)])),
     posts: posts.length,
     replies: posts.filter((p) => p.kind === 'reply').length,
@@ -219,12 +221,11 @@ export function interpretationInput(account, { days = 28, today = Date.now() } =
     topPosts: [...posts]
       .sort((a, b) => b.stats.impressions - a.stats.impressions)
       .slice(0, 5)
-      .map((p) => ({ kind: p.kind, impressions: p.stats.impressions, engagementRate: round(p.stats.engagementRate), follows: p.metrics?.Follows || 0, media: p.media, links: p.links })),
+      .map((p) => ({ kind: p.kind, impressions: p.stats.impressions, engagementRate: round(p.stats.engagementRate), follows: p.metrics?.Follows ?? null, media: p.media, links: p.links })),
     replyTargets: interactionLedger(account, { days, today })
       .slice(0, 8)
       .map((row) => ({ replies: row.replies, impressions: row.impressions, follows: row.follows, trend: row.trend })),
-    followerCount: account.info?.followers ?? null,
-    followConversion: round(rate(s.current.Follows || 0, s.current.ProfileVisits || 0))
+    followerCount: account.info?.followers ?? null
   };
 }
 
