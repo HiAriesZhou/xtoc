@@ -28,7 +28,16 @@ test('open X tabs get the content script again; other, discarded or unloaded tab
     { id: 5, url: 'https://twitter.com/a/status/2' }
   ];
   assert.deepEqual(reinjectionTargets(manifest, tabs), [
-    { tabId: 1, js: ['content_scripts/content-0.js'], css: ['content_scripts/content-0.css'] },
-    { tabId: 5, js: ['content_scripts/content-0.js'], css: ['content_scripts/content-0.css'] }
+    { tabId: 1, js: ['content_scripts/content-0.js'], css: ['content_scripts/content-0.css'], world: 'ISOLATED' },
+    { tabId: 5, js: ['content_scripts/content-0.js'], css: ['content_scripts/content-0.css'], world: 'ISOLATED' }
+  ]);
+});
+
+test('MAIN-world content scripts are re-injected into the MAIN world', () => {
+  const withTap = {
+    content_scripts: [{ matches: ['https://x.com/*'], js: ['content_scripts/tap.js'], world: 'MAIN' }]
+  };
+  assert.deepEqual(reinjectionTargets(withTap, [{ id: 7, url: 'https://x.com/i/account_analytics' }]), [
+    { tabId: 7, js: ['content_scripts/tap.js'], css: [], world: 'MAIN' }
   ]);
 });

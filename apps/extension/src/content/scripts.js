@@ -17,11 +17,13 @@ import {
 } from './excerpt-capture.js';
 import { captureCurrent } from './library-capture.js';
 import { initBookmarkImport } from './bookmark-import-panel.js';
+import { initAnalyticsBridge } from './analytics-bridge.js';
 import { createLifecycle } from './lifecycle.js';
 
 const TOC_SCROLL_OFFSET = 70;
 
 let bookmarkImport = null;
+let analyticsBridge = null;
 let pageObserver = null;
 let initialExtractTimeout = null;
 let active = true; // false once this instance is torn down
@@ -139,6 +141,7 @@ function scrollToHeader(index) {
 // Initialize
 async function init() {
   bookmarkImport = initBookmarkImport();
+  analyticsBridge = initAnalyticsBridge();
   // Wait for page to fully load
   initialExtractTimeout = setTimeout(() => {
     refreshTOC();
@@ -269,6 +272,7 @@ function teardown() {
   if (resizeFrame) cancelAnimationFrame(resizeFrame);
   destroyExcerptFeature();
   bookmarkImport?.destroy();
+  analyticsBridge?.destroy();
   try {
     chrome.runtime.onMessage.removeListener(handleMessage);
     chrome.storage.onChanged.removeListener(handleStorageChange);

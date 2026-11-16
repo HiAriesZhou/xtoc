@@ -21,6 +21,11 @@ export function reinjectionTargets(manifest, tabs) {
     .flatMap((tab) =>
       scripts
         .filter((script) => script.matches.some((pattern) => matchesPattern(tab.url, pattern)))
-        .map((script) => ({ tabId: tab.id, js: script.js || [], css: script.css || [] }))
+        .map((script) => ({
+          tabId: tab.id,
+          js: script.js || [],
+          css: script.css || [],
+          world: script.world === 'MAIN' ? 'MAIN' : 'ISOLATED'
+        }))
     );
 }

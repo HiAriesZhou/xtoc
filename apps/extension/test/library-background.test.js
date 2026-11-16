@@ -45,7 +45,8 @@ globalThis.chrome = {
       return true;
     }
   },
-  contextMenus: { onClicked: { addListener() {} } }
+  contextMenus: { onClicked: { addListener() {} } },
+  tabs: { onUpdated: { addListener() {} }, onRemoved: { addListener() {} } }
 };
 await import('../src/background.js');
 const trusted = {
@@ -272,4 +273,20 @@ test('only one AI request runs at a time, even when two arrive together', async 
     globalThis.fetch = originalFetch;
     await call('ai:forget');
   }
+});
+
+test('analytics messages are limited to their senders', async () => {
+  const fromLibraryCapture = await call('analytics:capture', { operation: 'contentPageQuery', body: {} });
+  assert.match(fromLibraryCapture.error, /must come from X/);
+  const fromXLoad = await call('analytics:load', {}, content);
+  assert.match(fromXLoad.error, /Open the Library/);
+  const loaded = await call('analytics:load');
+  assert.equal(loaded.ok, true);
+  assert.deepEqual(loaded.data.data.accounts, {});
+  assert.equal(loaded.data.prefs.autoSync, false);
+  const elsewhere = await call('analytics:capture', { operation: 'contentPageQuery', body: { data: null } }, content);
+  assert.deepEqual(elsewhere.data, { stored: false });
+  const analyticsPage = { ...content, url: 'https://x.com/i/account_analytics/content/' };
+  const bad = await call('analytics:capture', { operation: 'contentPageQuery', body: { data: null } }, analyticsPage);
+  assert.match(bad.error, /no analytics data/);
 });
