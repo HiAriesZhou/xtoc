@@ -38,8 +38,5 @@ jobs:
       - name: Test
         run: npm test
 
-      - name: Build Chromium, Edge and Firefox
-        run: |
-          npm run build
-          npm run build:edge
-          npm run build:firefox
+      - name: Build Chrome
+        run: npm run build
