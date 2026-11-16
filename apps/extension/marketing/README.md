@@ -31,8 +31,7 @@ capture the viewport at a device scale factor of 1, at exactly the output size. 
 | `social` | `social/xtoc-social-1280x640.png` | 1280 × 640 | — |
 
 After rendering into `marketing/rendered/`, copy each candidate to its upload path under root `store/assets/` and run `npm run check:store-assets`.
-The store icon is `src/icons/logo-128.png`, copied to `store/assets/icon/icon-128.png`. For Edge,
-which recommends a 300 × 300 logo, upload `assets/brand/logo.png` (512 × 512).
+The store icon is `src/icons/logo-128.png`, copied to `store/assets/icon/icon-128.png`.
 
 ## Real UI captures
 
