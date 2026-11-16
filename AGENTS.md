@@ -45,17 +45,15 @@ npm run dev
 npm run start
 npm test
 npm run build
-npm run build:firefox
-npm run build:edge
 npm run build:dev
 npm run build:zip
 ```
 
 - `npm test` runs the Node test suite under `test/`.
 - There is currently no lint script. Do not report lint as passed and do not run `npm run lint`. Add lint tooling only when that is part of the requested implementation work.
-- `npm run build` creates the Chromium build in `dist/chromium`; `build:firefox` and `build:edge` exercise their respective Extension.js targets. `dist/` and generated ZIP files are build artifacts and must stay untracked.
+- `npm run build` creates the Chrome Manifest V3 build in `dist/chromium`. `dist/` and generated ZIP files are build artifacts and must stay untracked.
 - `build:dev` runs `build`, then writes a local-only debug copy to the repository-root `dist/chromium-dev` (a fixed path: Chrome derives the unpacked extension ID and its storage from it) with the name `XTOC (Development)` and the icons from `tooling/dev-icons/`. Use it for local Chrome load-unpacked debugging only; never package, upload, or submit it. Regenerate dev icons with `node tooling/generate-dev-icons.mjs` after changing `src/icons/`; a test fails when they are stale.
-- `build:zip` builds Chromium, Edge and Firefox, then writes `release/xtoc-{chrome,edge,firefox}-v<version>.zip` for store upload and `release/xtoc-source-v<version>.zip` (a `git archive` of `HEAD`, for Mozilla review). It verifies each archive, the manifest version and Manifest V3/V2 per target, and refuses development branding or dev-only files. The source archive is skipped when the extension directory has uncommitted changes. Packaging is not a substitute for testing in Edge and Firefox, and does not authorize uploading.
+- `build:zip` builds Chrome and writes `release/xtoc-chrome-v<version>.zip` for store upload. It verifies archive integrity, the release version and Manifest V3, and refuses development branding or dev-only files. Packaging does not authorize uploading.
 
 ## Release package cleanup
 
@@ -66,10 +64,8 @@ npm run build:zip
 
 ## Browser boundaries and manual validation
 
-- Chrome/Chromium is the documented load-unpacked and store path. Load `dist/chromium` from `chrome://extensions/`.
-- Edge is Chromium-based but has its own build target. Load the generated Edge output from `edge://extensions/` and verify affected behavior there; a Chrome pass alone is not an Edge pass.
-- Firefox uses the manifest's Firefox branch (Manifest V2), while Chromium uses Manifest V3. Validate the generated Firefox manifest and load it as a temporary add-on from `about:debugging`; a successful build does not establish runtime API parity.
-- The implementation uses the `chrome.*` extension namespace and browser-conditional manifest keys. When changing manifest permissions, background behavior, popup opening, storage, messaging, or downloads, test every affected browser rather than assuming compatibility.
+- Chrome is the only maintained browser and store target. Load `dist/chromium` from `chrome://extensions/`. Do not add other browser builds, compatibility branches, store targets or runtime verification requirements.
+- The implementation uses the `chrome.*` extension namespace and a plain Manifest V3 manifest. When changing manifest permissions, background behavior, popup opening, storage, messaging or downloads, verify the affected flow in Chrome.
 - Host access and content-script behavior are limited to `https://x.com/*` and `https://twitter.com/*`. The one exception is the optional `https://*/*` host permission, requested at runtime only for the AI provider origin the user configures in Settings; never use it for content scripts, page access or any other request. Do not broaden host access further without a concrete implemented requirement and privacy review.
 - For browser-facing changes, inspect extension/background and page console errors, then manually verify the affected flow on a real X/Twitter long-form article: popup TOC, heading navigation, floating panel visibility/position, selection save, Options management, local persistence after reload, deletion, and Markdown/JSON export as applicable.
 
@@ -111,7 +107,7 @@ State the conventions a UI change applies before implementing it, and show scree
 - Before preparing a development/debug build containing extension changes, automatically ensure its version is newer than the latest confirmed official release; do not wait for a separate bump-version request.
 - Determine the official baseline from the latest published, non-prerelease GitHub Release and any explicitly confirmed browser-store release. Do not infer a published release from working-tree version fields or an unpublished tag. If the baseline cannot be verified, report that limitation rather than guessing.
 - Default to the next patch version (for example, official `0.4.8` becomes development `0.4.9`), unless the user specifies a different version. Use the next minor version for a new backward-compatible user-facing feature. Starting a separate feature branch is a new version boundary even when its base already contains an unreleased bump; repeated edits and builds within that feature branch do not require further increments. Documentation-only changes do not trigger a bump.
-- Keep `package.json`, `src/manifest.json`, `package-lock.json`'s root version, and version badges consistent, and verify generated manifests after building. `package-lock.json` is tracked so Extension.js resolves the same way for every build, including Mozilla's source review; update it with `npm install`, never by hand. Do not force-add build artifacts.
+- Keep `package.json`, `src/manifest.json`, `package-lock.json`'s root version, and version badges consistent, and verify generated manifests after building. `package-lock.json` is tracked so Extension.js resolves the same way for every build; update it with `npm install`, never by hand. Do not force-add build artifacts.
 - A development bump does not authorize commit, push, deployment, tag creation, store submission, or publication. Never move an existing release tag. Do not mark a development build as published merely because its version increased.
 
 ## GitHub Release contract
@@ -133,7 +129,7 @@ Before creating a GitHub Release:
 Before reporting a release-ready change:
 
 1. Review `git diff` and `git status`; confirm generated artifacts and unrelated user changes are not included.
-2. Run `npm test` and the builds for every supported or affected browser. State any skipped command and why.
+2. Run `npm test` and the Chrome build. State any skipped command and why.
 3. Perform the relevant manual browser flows above. A build-only check is insufficient for runtime changes.
 4. Confirm version references agree across `package.json`, `src/manifest.json`, README badges, and intended release metadata when a version change is requested.
 5. Recheck permissions, local-data behavior, export compatibility, and absence of private material, credentials, internal services, or unimplemented claims.
