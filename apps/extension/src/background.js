@@ -377,8 +377,8 @@ async function reinjectContentScripts() {
   }
 }
 
-chrome.contextMenus.onClicked.addListener(() => {
-  chrome.action.openPopup?.()?.catch(() => {});
+chrome.contextMenus.onClicked.addListener((info, tab) => {
+  if (info.menuItemId === 'showTOC' && tab?.id) chrome.tabs.sendMessage(tab.id, { action: 'showPanel' }).catch(() => {});
 });
 
 chrome.runtime.onMessage.addListener((message, sender, respond) => {

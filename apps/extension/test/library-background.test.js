@@ -2,7 +2,8 @@ import test from 'node:test';
 import 'fake-indexeddb/auto';
 import assert from 'node:assert/strict';
 
-let listener;
+let listener, menuListener;
+const tabMessages = [];
 let failWrite = false;
 let localWrites = 0;
 let local = {},
@@ -46,8 +47,8 @@ globalThis.chrome = {
       return true;
     }
   },
-  contextMenus: { onClicked: { addListener() {} } },
-  tabs: { onUpdated: { addListener() {} }, onRemoved: { addListener() {} } }
+  contextMenus: { onClicked: { addListener(fn) { menuListener = fn; } } },
+  tabs: { async sendMessage(id, message) { tabMessages.push({id, message}); }, onUpdated: { addListener() {} }, onRemoved: { addListener() {} } }
 };
 await import('../src/background.js');
 const trusted = {
@@ -290,4 +291,9 @@ test('analytics messages are limited to their senders', async () => {
   const analyticsPage = { ...content, url: 'https://x.com/i/account_analytics/content/' };
   const bad = await call('analytics:capture', { operation: 'contentPageQuery', body: { data: null } }, analyticsPage);
   assert.match(bad.error, /no analytics data/);
+});
+
+test('Show Table of Contents opens the article panel directly', async () => {
+  menuListener({ menuItemId:'showTOC' }, {id:7});
+  assert.deepEqual(tabMessages.at(-1), { id:7, message:{ action:'showPanel' } });
 });
