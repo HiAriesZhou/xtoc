@@ -442,3 +442,12 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .sync-preference { display: grid; gap: 8px; font-size: 13px; font-weight: 600; }
 .sync-preference small { display: block; margin-top: 4px; color: var(--text-muted); font-size: 12px; font-weight: 400; }
 .sync-preference select { width: 100%; max-width: 380px; }
+
+.global-nav { display:flex; align-items:center; gap:32px; padding:12px 24px; border-bottom:1px solid var(--border); background:var(--surface); }
+.global-nav .brand { padding:0; color:var(--text); }
+.global-nav nav { display:flex; gap:8px; }
+.global-nav nav a { padding:8px 12px; color:var(--text-muted); border-radius:7px; font-weight:600; }
+.global-nav nav a[aria-current] { color:var(--accent); background:var(--accent-tint); }
+.app { min-height:calc(100vh - 65px); }
+.sidebar { top:0; height:auto; min-height:100%; padding-top:24px; }
+@media(max-width:640px) { .global-nav { padding:12px; gap:12px; flex-wrap:wrap; } .global-nav nav { gap:0; } .global-nav nav a { padding:8px; } }

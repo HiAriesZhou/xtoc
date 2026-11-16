@@ -307,7 +307,7 @@ export function cadenceCard(weeks) {
 export function aiCard(aiState, configured) {
   const button = configured
     ? `<button type="button" class="btn btn-secondary btn-sm" data-action="interpret"${aiState.loading ? ' disabled' : ''}>${icon('sparkles', 14)}${aiState.loading ? 'Reading…' : aiState.result ? 'Read again' : 'Explain with AI'}</button>`
-    : '<a class="btn btn-ghost btn-sm" href="#settings">Set up AI in Settings</a>';
+    : '<a class="btn btn-ghost btn-sm" href="../settings/index.html">Set up AI in Settings</a>';
   const result = aiState.result
     ? `<div class="suggestion"><p>${esc(aiState.result.summary)}</p>
         ${aiState.result.findings.length ? `<h3>Findings</h3><ul>${aiState.result.findings.map((f) => `<li>${esc(f)}</li>`).join('')}</ul>` : ''}

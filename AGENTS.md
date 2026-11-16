@@ -51,6 +51,7 @@ npm run build:zip
 
 - `npm test` runs the Node test suite under `test/`.
 - There is currently no lint script. Do not report lint as passed and do not run `npm run lint`. Add lint tooling only when that is part of the requested implementation work.
+- `npm run build` bundles background/content scripts and runs `tooling/build-pages.mjs` to emit the separate Library, Analytics, Settings and popup native ES-module pages. Legacy `options/index.html` hashes redirect to their module. Verify every emitted page and its relative imports.
 - `npm run build` creates the Chrome Manifest V3 build in `dist/chromium`. `dist/` and generated ZIP files are build artifacts and must stay untracked.
 - `build:dev` runs `build`, then writes a local-only debug copy to the repository-root `dist/chromium-dev` (a fixed path: Chrome derives the unpacked extension ID and its storage from it) with the name `XTOC (Development)` and the icons from `tooling/dev-icons/`. Use it for local Chrome load-unpacked debugging only; never package, upload, or submit it. Regenerate dev icons with `node tooling/generate-dev-icons.mjs` after changing `src/icons/`; a test fails when they are stale.
 - Extension.js 3.7 adds a bridge script for each `world: MAIN` content script but never emits it; `public/content_scripts/content-2.js` is the placeholder at that path (`test/main-world-bridge.test.js`), and `build:zip` refuses a manifest that names a missing file. Adding or reordering content scripts changes the expected path.

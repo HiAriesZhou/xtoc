@@ -146,6 +146,7 @@ export function createAnalyticsService({
         sync: { running: sync.running, trigger: sync.trigger, lastSuccessAt: sync.lastSuccessAt, error: sync.error },
         accounts: Object.values(data.accounts).map(accountSummary) };
     },
+    readOverview: accountId => repository.read({ accountId, since: now() - 8 * DAY, kinds: ['daily'] }),
     readAccount: accountId => repository.read({ accountId, since: now() - 181 * DAY })
   };
 }

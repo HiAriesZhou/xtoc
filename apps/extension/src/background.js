@@ -1,4 +1,5 @@
-import { KEYS, readState, writeState, mutate } from './library/model.js';
+import { summary } from './analytics/metrics.js';
+import { bookmarkList, KEYS, readState, writeState, mutate } from './library/model.js';
 import { aiInput, generateSuggestion, listModels, normalizeBaseUrl } from './library/ai.js';
 import { detectProvider, findProvider, parseModelList } from './library/ai-providers.js';
 import { applySeed, removeSeed, SEED_PATH } from './library/dev-seed.js';
@@ -53,7 +54,16 @@ function transaction(fn) {
 }
 
 const fromLibrary = (sender) =>
-  sender.id === chrome.runtime.id && sender.url?.startsWith(chrome.runtime.getURL('options/'));
+  sender.id === chrome.runtime.id && ['options/', 'library/', 'analytics/', 'settings/'].some(path => sender.url?.startsWith(chrome.runtime.getURL(path)));
+const fromPopup = sender => sender.id === chrome.runtime.id && sender.url === chrome.runtime.getURL('popup/index.html');
+async function openPage(page, route = '', accountId = '') {
+  if (!['library','analytics','settings'].includes(page)) throw new Error('Unknown page.');
+  const url = chrome.runtime.getURL(`${page}/index.html`) + (page === 'analytics' && /^\d{1,25}$/.test(accountId) ? `?account=${accountId}` : '');
+  let existing;
+  try { existing = await chrome.runtime.sendMessage({ action: 'app:locate', page }); } catch {}
+  if (existing) { await chrome.tabs.update(existing.id, { active: true, ...((route || accountId) ? { url: url + (route ? `#${route}` : '') } : {}) }); await chrome.windows.update(existing.windowId, { focused: true }); }
+  else await chrome.tabs.create({ url: url + (route ? `#${route}` : '') });
+}
 
 function fromXPage(sender) {
   try {
@@ -254,9 +264,25 @@ async function readSeed() {
 
 async function dispatch(message, sender) {
   const { action, payload = {} } = message;
+  if (action === 'app:open') {
+    if (!fromPopup(sender) && !fromLibrary(sender)) throw new Error('Not allowed.');
+    await openPage(payload.page, ['clips','bookmarks','analytics','data'].includes(payload.route) ? payload.route : '', payload.accountId); return {};
+  }
+  if (action === 'popup:summary') {
+    if (!fromPopup(sender)) throw new Error('Not allowed.');
+    const state = await load();
+    const recent = [...bookmarkList(state).map(item => ({ title: item.title, url: item.url, at: item.capturedAt, kind: 'Bookmark' })), ...Object.values(state.clips).map(item => ({ title: item.text, url: state.articles[item.articleId]?.url || item.pageUrl, at: item.createdAt, kind: 'Clip' }))].sort((a,b) => Date.parse(b.at) - Date.parse(a.at)).slice(0,2);
+    const status = await analytics.status();
+    const accounts = Object.values(status.data.accounts);
+    const id = accounts.some(a => a.id === payload.accountId) ? payload.accountId : status.prefs.accountId || accounts[0]?.id;
+    const account = id ? (await analytics.readOverview(id)).accounts[id] : null;
+    const stats = account ? summary(account, { days: 7 }) : null;
+    const q = status.sync.accounts?.[id] || {};
+    return { bookmarks: Object.keys(state.bookmarks).length, clips: Object.keys(state.clips).length, recent, accounts: accounts.map(a => ({ id:a.id, handle:a.handle })), accountId:id, stats: stats ? { coverage:stats.coverage, kpis:stats.kpis.slice(0,3), start:stats.start, end:stats.end } : null, sync: { running:status.sync.running, paused:q.paused, queued:q.pending?.length || 0, capturedAt:q.lastCaptureAt, error:q.error, mode:status.prefs.mode } };
+  }
   if (action === 'openClips' || action === 'openLibrary') {
     if (sender.id !== chrome.runtime.id) throw new Error('Not allowed.');
-    await chrome.runtime.openOptionsPage();
+    await openPage('library', action === 'openClips' ? 'clips' : 'bookmarks');
     return {};
   }
   if (action === 'library:capture' || action === 'library:saveClip') {
@@ -351,12 +377,12 @@ async function reinjectContentScripts() {
   }
 }
 
-chrome.contextMenus.onClicked.addListener(() => {
-  chrome.action.openPopup?.()?.catch(() => {});
+chrome.contextMenus.onClicked.addListener((info, tab) => {
+  if (info.menuItemId === 'showTOC' && tab?.id) chrome.tabs.sendMessage(tab.id, { action: 'showPanel' }).catch(() => {});
 });
 
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
-  if (typeof message?.action !== 'string') return false;
+  if (typeof message?.action !== 'string' || message.action === 'app:locate') return false;
   dispatch(message, sender).then(
     (data) => respond({ ok: true, data }),
     (error) => respond({ ok: false, error: error.message })
