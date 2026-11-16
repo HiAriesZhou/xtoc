@@ -137,14 +137,14 @@ const sortedPosts = (account) =>
 // the same kind (posts vs replies reach very different audiences).
 function withBaselines(posts) {
   const history = {}; // local per-kind lists, built in time order
-  return posts.map((post, i) => {
-    const own = (history[post.kind] ||= []);
-    const window = own.map(impressionsAt48h).filter(Number.isFinite).slice(-BASELINE_POSTS);
+  return posts.map(post => {
+    const window = (history[post.kind] ||= []);
     const baseline = window.length >= MIN_BASELINE ? median(window) : null;
-    own.push(post);
+    const baselineCount = window.length;
     const stats = postStats(post);
     const at48h = impressionsAt48h(post);
-    return { ...post, stats, baseline, baselineCount: window.length, at48h, multiple: baseline && at48h !== null ? at48h / baseline : null };
+    if (Number.isFinite(at48h)) { window.push(at48h); if (window.length > BASELINE_POSTS) window.shift(); }
+    return { ...post, stats, baseline, baselineCount, at48h, multiple: baseline && at48h !== null ? at48h / baseline : null };
   });
 }
 

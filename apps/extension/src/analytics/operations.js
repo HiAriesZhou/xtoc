@@ -56,7 +56,7 @@ export const isDiagnosticPath = (path) => /^\/(?:i\/account_analytics|notificati
 export const ANALYTICS_ORIGIN = 'https://x.com';
 
 // Captures are accepted only from X's own analytics pages, the Mentions page
-// for the notifications operation, or the sync tab.
+// for the notifications operation.
 export function isAnalyticsPage(value) {
   try {
     const url = new URL(value);
@@ -79,75 +79,8 @@ export function isCapturePage(value, operation) {
 }
 export const PREMIUM_REDIRECTS = ['/i/premium_sign_up', '/i/flow/login', '/i/jf/onboarding', '/login'];
 
-const DAY_MS = 86400000;
-// A live check showed X's content query returns only a sample of posts for
-// long ranges (a year gave 245 of 749 posts) but complete results for 28 days.
-// X's own content page offers at most three months.
-export const CONTENT_WINDOW_DAYS = 28;
-export const MAX_BACKFILL_DAYS = 3 * CONTENT_WINDOW_DAYS;
-const OVERLAP_DAYS = 2; // recent numbers keep changing, so each sync re-reads them
-
-const isoDay = (ms) => new Date(ms).toISOString().slice(0, 10);
-
-// Content windows, newest first: everything since the last successful sync
-// (plus overlap), or 12 weeks on the first run. The page reads from/to from
-// its URL, so no clicks are needed.
-export function contentRanges(lastSuccessAt, now = Date.now()) {
-  const last = Date.parse(lastSuccessAt || '');
-  const days = Number.isFinite(last)
-    ? Math.min(MAX_BACKFILL_DAYS, Math.ceil((now - last) / DAY_MS) + OVERLAP_DAYS)
-    : MAX_BACKFILL_DAYS;
-  const ranges = [];
-  for (let end = 0; end < days; end += CONTENT_WINDOW_DAYS) {
-    const span = Math.min(CONTENT_WINDOW_DAYS, days - end);
-    ranges.push({ from: isoDay(now - (end + span - 1) * DAY_MS), to: isoDay(now - end * DAY_MS) });
-  }
-  return ranges;
-}
-
 export const contentUrl = ({ from, to }) =>
   `${ANALYTICS_ORIGIN}/i/account_analytics/content/?type=all&from=${from}&to=${to}`;
-
-// One sync visits the content page (once per window), audience, overview and Mentions in a background tab and waits for the operation
-// each page must load. Optional operations are kept when they arrive.
-export function syncSteps(lastSuccessAt, now = Date.now()) {
-  const content = contentRanges(lastSuccessAt, now).map((range, i) => ({
-    id: i ? `content-${i + 1}` : 'content',
-    url: contentUrl(range),
-    expect: OPERATIONS.content,
-    range
-  }));
-  return [
-    ...content,
-    {
-      id: 'audience',
-      url: `${ANALYTICS_ORIGIN}/i/account_analytics/audience`,
-      expect: OPERATIONS.audience
-    },
-    {
-      id: 'overview',
-      url: `${ANALYTICS_ORIGIN}/i/account_analytics`,
-      expect: OPERATIONS.overviewDaily
-    },
-    // Optional: a missing Mentions timeline never fails the sync.
-    { id: 'mentions', url: MENTIONS_URL, expect: OPERATIONS.mentions, alsoExpect: [OPERATIONS.mentionsRelay], optional: true }
-  ];
-}
-
-// The content page returns at most 1000 posts per range. When a capture hits
-// that cap, the next step reads the older part of the range.
-export const CONTENT_PAGE_LIMIT = 1000;
-
-export function olderContentStep(range, oldestPostMs, n = 1) {
-  const to = isoDay(oldestPostMs);
-  if (!range?.from || to <= range.from) return null;
-  return {
-    id: `content-older-${n}`,
-    url: contentUrl({ from: range.from, to }),
-    expect: OPERATIONS.content,
-    range: { from: range.from, to }
-  };
-}
 
 export const AUTO_SYNC_INTERVAL_MS = 20 * 60 * 60 * 1000; // about once a day
 
@@ -164,4 +97,31 @@ export function isPremiumRedirect(value) {
   } catch {
     return false;
   }
+}
+
+// Read only date-bound variables from an allowlisted analytics request. Never
+// forward the URL, request body, headers, account IDs or authentication data.
+export function analyticsRequestRange(url, body) {
+  let variables;
+  try {
+    const value = new URL(String(url), ANALYTICS_ORIGIN).searchParams.get('variables');
+    const payload = typeof body === 'string' && body.length < 100000 ? JSON.parse(body) : null;
+    variables = value ? JSON.parse(value) : payload?.variables;
+    if (typeof variables === 'string') variables = JSON.parse(variables);
+  } catch { return null; }
+  const out = {};
+  function visit(object, depth = 0) {
+    if (!object || typeof object !== 'object' || depth > 5) return;
+    for (const [key, value] of Object.entries(object).slice(0, 80)) {
+      const name = key.replaceAll('_', '').toLowerCase();
+      const side = ['from', 'fromdate', 'fromtime', 'startdate', 'starttime'].includes(name) ? 'from'
+        : ['to', 'todate', 'totime', 'enddate', 'endtime'].includes(name) ? 'to' : '';
+      if (side && (typeof value === 'string' || typeof value === 'number')) {
+        const ms = /^\d{10,13}$/.test(String(value)) ? Number(value) * (String(value).length === 10 ? 1000 : 1) : Date.parse(value);
+        if (Number.isFinite(ms) && ms > Date.UTC(2006, 0) && ms < Date.UTC(2100, 0)) out[side] = new Date(ms).toISOString().slice(0, 10);
+      } else if (typeof value === 'object') visit(value, depth + 1);
+    }
+  }
+  visit(variables);
+  return out.from && out.to ? out : null;
 }

@@ -107,7 +107,9 @@ export function createAnalyticsRepository({ storage, indexedDB = globalThis.inde
     const tx = db.transaction(['accounts', 'records'], 'readwrite');
     const completion = done(tx);
     try {
-      const meta = await request(tx.objectStore('accounts').get(id)) || { id, counts: {} };
+      const existing = await request(tx.objectStore('accounts').get(id));
+      if (!existing && await request(tx.objectStore('accounts').count()) >= 10) throw new Error('XTOC keeps analytics for up to 10 X accounts. Delete one in Analytics first.');
+      const meta = existing || { id, counts: {} };
       // Reduce only affected records; historical size never multiplies a write.
       const current = { ...meta };
       const keys = {

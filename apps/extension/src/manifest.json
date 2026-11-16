@@ -26,7 +26,8 @@
     "activeTab",
     "storage",
     "unlimitedStorage",
-    "scripting"
+    "scripting",
+    "alarms"
   ],
   "host_permissions": [
     "https://x.com/*",

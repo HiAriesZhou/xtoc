@@ -3,14 +3,11 @@ import assert from 'node:assert/strict';
 import {
   analyticsOperation,
   autoSyncDue,
-  contentRanges,
   graphqlOperationName,
   isDiagnosticPath,
   isAnalyticsPage,
   isCapturePage,
-  isPremiumRedirect,
-  olderContentStep,
-  syncSteps
+  isPremiumRedirect
 } from '../src/analytics/operations.js';
 import { parseCapture, restIdFromGlobal, toMs } from '../src/analytics/parse.js';
 import { ACCOUNT_ID, GLOBAL_ID, audience, content, day0, mentions, overviewDaily, overviewHourly, tweet } from './analytics-fixtures.js';
@@ -25,35 +22,8 @@ test('analyticsOperation recognizes only X analytics GraphQL operations', () => 
   assert.equal(analyticsOperation('not a url %%'), null);
 });
 
-test('contentRanges backfill 12 weeks in windows of at most 28 days, then only what is new', () => {
-  const now = Date.parse('2026-10-26T12:00:00Z');
-  assert.deepEqual(contentRanges(null, now), [
-    { from: '2026-09-29', to: '2026-10-26' },
-    { from: '2026-09-01', to: '2026-09-28' },
-    { from: '2026-08-04', to: '2026-08-31' }
-  ]);
-  assert.deepEqual(contentRanges('2026-10-24T08:00:00Z', now), [{ from: '2026-10-22', to: '2026-10-26' }]);
-  assert.equal(contentRanges('2020-01-01T00:00:00Z', now).length, 3);
-});
 
-test('syncSteps visit content, audience and overview with their expected operations', () => {
-  const steps = syncSteps(null, Date.parse('2026-10-26T12:00:00Z'));
-  assert.deepEqual(steps.map((s) => s.expect), ['contentPageQuery', 'contentPageQuery', 'contentPageQuery', 'audienceOverviewDataQuery', 'accountOverviewDailyQuery', 'NotificationsTimeline']);
-  assert.deepEqual(steps.map((s) => s.id), ['content', 'content-2', 'content-3', 'audience', 'overview', 'mentions']);
-  assert.deepEqual(steps.map((s) => Boolean(s.optional)), [false, false, false, false, false, true]);
-  assert.equal(syncSteps('2026-10-25T12:00:00Z', Date.parse('2026-10-26T12:00:00Z')).length, 4);
-  assert.match(steps[0].url, /^https:\/\/x\.com\/i\/account_analytics\/content\/\?type=all&from=2026-09-29&to=2026-10-26$/);
-  assert.deepEqual(steps[0].range, { from: '2026-09-29', to: '2026-10-26' });
-});
 
-test('olderContentStep continues below the oldest captured post, and stops at the range start', () => {
-  const range = { from: '2026-01-01', to: '2026-10-26' };
-  const step = olderContentStep(range, Date.parse('2026-06-15T10:00:00Z'));
-  assert.equal(step.url, 'https://x.com/i/account_analytics/content/?type=all&from=2026-01-01&to=2026-06-15');
-  assert.equal(step.id, 'content-older-1');
-  assert.equal(olderContentStep(range, Date.parse('2026-06-15T10:00:00Z'), 2).id, 'content-older-2');
-  assert.equal(olderContentStep(range, Date.parse('2026-01-01T10:00:00Z')), null);
-});
 
 test('autoSyncDue requires opt-in and waits about a day between attempts', () => {
   const now = Date.parse('2026-10-26T12:00:00Z');
@@ -233,4 +203,12 @@ test('content rows wrapped in TweetWithVisibilityResults are read', () => {
   assert.equal(parsed.posts.length, 1);
   assert.equal(parsed.posts[0].metrics.Impressions, 6500);
   assert.deepEqual(parsed.dropped, {});
+});
+
+test('request metadata copies only dates, with bounded malformed input handling', async () => {
+  const { analyticsRequestRange } = await import('../src/analytics/operations.js');
+  const url = 'https://x.com/i/api/graphql/query/accountOverviewDailyQuery?variables=' + encodeURIComponent(JSON.stringify({ from: '2026-10-19', to: '2026-11-15', private: 'not forwarded' }));
+  assert.deepEqual(analyticsRequestRange(url), { from: '2026-10-19', to: '2026-11-15' });
+  assert.deepEqual(analyticsRequestRange('https://x.com/', JSON.stringify({ variables: { start_time: 1792368000000, end_time: 1794700800000 } })), { from: '2026-10-19', to: '2026-11-15' });
+  assert.equal(analyticsRequestRange('invalid', 'not json'), null);
 });

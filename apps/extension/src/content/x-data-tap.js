@@ -4,7 +4,7 @@
 // never changes a request or response, and ignores every other operation.
 // On analytics and notifications pages it also reports the *names* of the
 // GraphQL operations it sees, and responses it could not read, for diagnostics.
-import { analyticsOperation, graphqlOperationName, isDiagnosticPath } from '../analytics/operations.js';
+import { analyticsOperation, analyticsRequestRange, graphqlOperationName, isDiagnosticPath } from '../analytics/operations.js';
 
 const TAP = 'xtoc-tap';
 const BRIDGE = 'xtoc-bridge';
@@ -27,7 +27,7 @@ function install() {
     if (buffer.length > (message.type === 'capture' ? MAX_CAPTURES : MAX_SEEN)) buffer.shift();
   }
 
-  const emit = (operation, body) => send({ type: 'capture', capture: { operation, body, at: Date.now() } });
+  const emit = (operation, body, meta) => send({ type: 'capture', capture: { operation, body, ...meta, at: Date.now() } });
 
   function seen(url, response, read) {
     if (!isDiagnosticPath(location.pathname)) return;
@@ -57,17 +57,19 @@ function install() {
 
   const nativeFetch = window.fetch;
   window.fetch = function fetch(...args) {
+    const requestedAt = Date.now();
     const pending = nativeFetch.apply(this, args);
     try {
       const url = requestUrl(args[0]);
       const operation = analyticsOperation(url);
+      const requestMeta = { requestedAt, range: operation ? analyticsRequestRange(url, args[1]?.body) : null };
       pending
         .then(async (response) => {
           const meta = { status: response.status, contentType: response.headers.get('content-type') };
           if (!operation) return seen(url, meta, 'not captured');
           if (!response.ok) return seen(url, meta, 'http error');
           try {
-            emit(operation, await response.clone().json());
+            emit(operation, await response.clone().json(), requestMeta);
             seen(url, meta, 'captured');
           } catch {
             seen(url, meta, 'not json');
@@ -88,6 +90,7 @@ function install() {
   // One listener per XHR object; it reads the URL of the request that just
   // finished, so a reused object never reports an earlier operation.
   XMLHttpRequest.prototype.send = function (...args) {
+    this.__xtocRequestMeta = { requestedAt: Date.now(), range: analyticsOperation(this.__xtocUrl) ? analyticsRequestRange(this.__xtocUrl, args[0]) : null };
     if (!this.__xtocListening) {
       this.__xtocListening = true;
       this.addEventListener('load', onXhrLoad);
@@ -108,7 +111,7 @@ function install() {
       if (!operation) return seen(url, meta, 'not captured');
       if (this.status < 200 || this.status >= 300) return seen(url, meta, 'http error');
       const body = this.responseType === 'json' ? this.response : JSON.parse(this.responseText);
-      if (body) emit(operation, body);
+      if (body) emit(operation, body, this.__xtocRequestMeta);
       seen(url, meta, 'captured');
     } catch {
       // Not JSON or not readable; skip.

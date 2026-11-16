@@ -1,10 +1,12 @@
-import test from 'node:test';
+import test, { afterEach } from 'node:test';
 import 'fake-indexeddb/auto';
 import { createAnalyticsRepository } from '../src/analytics-db.js';
 import assert from 'node:assert/strict';
 import { createAnalyticsService } from '../src/analytics-service.js';
 import { ACCOUNT_ID, audience, content, day0, mentions, overviewDaily, overviewHourly, tweet } from './analytics-fixtures.js';
 
+const active = [];
+afterEach(async () => { for (const service of active.splice(0)) await service.pause(); });
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function harness({ now = Date.parse('2026-10-26T12:00:00Z'), stepTimeoutMs = 200 } = {}) {
@@ -35,6 +37,7 @@ function harness({ now = Date.parse('2026-10-26T12:00:00Z'), stepTimeoutMs = 200
     onRemoved: { addListener: (fn) => listeners.removed.push(fn) }
   };
   const service = createAnalyticsService({ diagnosticsEnabled: true, repository: createAnalyticsRepository({ storage, name: crypto.randomUUID() }), storage, tabs, now: () => now, stepTimeoutMs, settleMs: 5 });
+  active.push(service);
   return { service, data, log, listeners };
 }
 
@@ -74,73 +77,6 @@ test('a later response without an account ID uses the account seen in the same t
   assert.ok(data.accounts[ACCOUNT_ID].hourly);
 });
 
-test('sync visits content, audience and overview in an inactive tab, then closes it', async () => {
-  const { service, log, data } = harness();
-  data.xtocAnalyticsSync = { lastSuccessAt: '2026-10-25T12:00:00.000Z' }; // one content window
-  data.xtocAnalytics = { version: 1, accounts: { 5: { id: '5', posts: { 1: { id: '1' } } } } }; // posts stored, so incremental
-  assert.deepEqual(await service.sync(), { running: true });
-  assert.deepEqual(log[0].slice(0, 1).concat(log[0][2]), ['create', false]);
-  assert.match(log[0][1], /\/i\/account_analytics\/content\/\?type=all&from=2026-10-24&to=2026-10-26$/);
-  const tab = fromTab(10);
-  await service.capture({ operation: 'accountOverviewDailyQuery', body: overviewDaily() }, tab); // not this step's query
-  await service.capture({ operation: 'contentPageQuery', body: content([tweet({ id: '1', createdAt: day0 })]) }, tab);
-  await wait(20);
-  assert.deepEqual(log.at(-1), ['update', 10, 'https://x.com/i/account_analytics/audience']);
-  await service.capture({ operation: 'audienceOverviewDataQuery', body: audience() }, tab);
-  await wait(20);
-  assert.deepEqual(log.at(-1), ['update', 10, 'https://x.com/i/account_analytics']);
-  await service.capture({ operation: 'accountOverviewDailyQuery', body: overviewDaily() }, tab);
-  await wait(20);
-  assert.deepEqual(log.at(-1), ['update', 10, 'https://x.com/notifications/mentions']);
-  await service.capture({ operation: 'notificationsQuery', body: mentions() }, fromTab(10, 'https://x.com/notifications/mentions'));
-  await wait(20);
-  assert.deepEqual(log.at(-1), ['remove', 10]);
-  const loaded = await service.load();
-  assert.equal(loaded.sync.ok, true);
-  assert.equal(loaded.sync.running, false);
-  assert.equal(loaded.sync.lastSuccessAt, '2026-10-26T12:00:00.000Z');
-  assert.deepEqual(loaded.sync.steps.map((s) => s.ok), [true, true, true, true]);
-  assert.ok(loaded.data.accounts[ACCOUNT_ID].inbound['501']);
-});
-
-test('a missing Mentions timeline does not fail the sync', async () => {
-  const { service, data } = harness({ stepTimeoutMs: 30 });
-  data.xtocAnalyticsSync = { lastSuccessAt: '2026-10-25T12:00:00.000Z' };
-  data.xtocAnalytics = { version: 1, accounts: { 5: { id: '5', posts: { 1: { id: '1' } } } } }; // posts stored, so incremental
-  await service.sync();
-  const tab = fromTab(10);
-  await service.capture({ operation: 'contentPageQuery', body: content([tweet({ id: '1', createdAt: day0 })]) }, tab);
-  await wait(15);
-  await service.capture({ operation: 'audienceOverviewDataQuery', body: audience() }, tab);
-  await wait(15);
-  await service.capture({ operation: 'accountOverviewDailyQuery', body: overviewDaily() }, tab);
-  await wait(80);
-  const { sync } = await service.load();
-  assert.equal(sync.ok, true);
-  assert.deepEqual(sync.steps.map((s) => s.ok), [true, true, true, false]);
-});
-
-test('sync fails clearly on a Premium/login redirect, a timeout or a closed tab', async () => {
-  const first = harness();
-  await first.service.sync();
-  first.listeners.updated.forEach((fn) => fn(10, { url: 'https://x.com/i/premium_sign_up' }));
-  await wait(10);
-  assert.match((await first.service.load()).sync.error, /needs X Premium/);
-
-  const second = harness({ stepTimeoutMs: 20 });
-  await second.service.sync();
-  await wait(60);
-  const timedOut = (await second.service.load()).sync;
-  assert.match(timedOut.error, /did not load the content page/);
-  assert.equal(timedOut.lastSuccessAt, null);
-
-  const third = harness();
-  await third.service.sync();
-  third.listeners.removed.forEach((fn) => fn(10));
-  await wait(10);
-  assert.match((await third.service.load()).sync.error, /closed before it finished/);
-});
-
 test('only one sync runs at a time', async () => {
   const { service, log } = harness();
   await Promise.all([service.sync(), service.sync(), service.visit()]);
@@ -163,16 +99,6 @@ test('clear removes one account or everything', async () => {
   assert.deepEqual((await service.clear({})).data.accounts, {});
 });
 
-test('a run lost with the worker is cleaned up on the next event and still counts as an attempt', async () => {
-  const { service, data, log } = harness();
-  data.xtocAnalyticsSync = { running: true, tabId: 44, lastAttemptAt: '2026-10-26T11:59:00.000Z' };
-  await service.setPrefs({ autoSync: true });
-  assert.deepEqual(await service.visit(), { started: false }); // attempted a minute ago
-  assert.deepEqual(log.at(-1), ['remove', 44]);
-  assert.match(data.xtocAnalyticsSync.error, /interrupted/);
-  assert.equal(data.xtocAnalyticsSync.running, false);
-});
-
 test('starting a sync records the attempt immediately', async () => {
   const { service, data } = harness();
   await service.sync();
@@ -186,7 +112,7 @@ test('diagnostics record shapes and outcomes per operation, without values', asy
   await service.capture({ operation: 'accountOverviewDailyQuery', body: overviewDaily() }, fromTab(1, 'https://x.com/home'));
   await assert.rejects(service.capture({ operation: 'audienceOverviewDataQuery', body: { data: null } }, fromTab(1)));
   const report = await service.diagnostics();
-  assert.deepEqual(report.captures.contentPageQuery.records, { posts: 1, rows: 1, dropped: {}, postDays: ['2026-10-20', '2026-10-20'] });
+  assert.deepEqual(report.captures.contentPageQuery.records, { posts: 1, rows: 1, dropped: {}, truncated: false });
   assert.equal(report.captures.contentPageQuery.path, '/i/account_analytics');
   assert.equal(report.captures.accountOverviewDailyQuery.accepted, false);
   assert.match(report.captures.audienceOverviewDataQuery.error, /no analytics data/);
@@ -210,23 +136,6 @@ test('mentions outside a sync are not guessed onto a stored account', async () =
   await assert.rejects(service.capture({ operation: 'NotificationsTimeline', body }, fromTab(5, 'https://x.com/notifications/mentions')), /which X account/);
   const { data } = await service.load();
   assert.deepEqual(data.accounts[ACCOUNT_ID].inbound, {});
-});
-
-test('the first sync reads 12 weeks of content in three windows', async () => {
-  const { service, log } = harness();
-  await service.sync();
-  const tab = fromTab(10);
-  for (let i = 0; i < 3; i++) {
-    await service.capture({ operation: 'contentPageQuery', body: content([tweet({ id: String(i + 1), createdAt: day0 })]) }, tab);
-    await wait(20);
-  }
-  const urls = log.filter((entry) => entry[0] !== 'remove').map((entry) => entry.at(-1) === false ? entry[1] : entry[2]);
-  assert.deepEqual(urls.slice(0, 4).map((url) => url.replace(/^https:\/\/x\.com/, '')), [
-    '/i/account_analytics/content/?type=all&from=2026-09-29&to=2026-10-26',
-    '/i/account_analytics/content/?type=all&from=2026-09-01&to=2026-09-28',
-    '/i/account_analytics/content/?type=all&from=2026-08-04&to=2026-08-31',
-    '/i/account_analytics/audience'
-  ]);
 });
 
 test('deleting analytics data makes the next sync backfill again', async () => {
@@ -262,24 +171,6 @@ test('post details go to the account that has the post, even in a new tab', asyn
   assert.ok(data.accounts[ACCOUNT_ID].postDetails['55'].first48);
 });
 
-test('deleting data during a sync keeps the next sync a full backfill', async () => {
-  const { service, data } = harness();
-  data.xtocAnalytics = { version: 1, accounts: { 5: { id: '5', posts: { 1: { id: '1' } } } } };
-  data.xtocAnalyticsSync = { lastSuccessAt: '2026-10-25T12:00:00.000Z' };
-  await service.sync();
-  await service.clear({});
-  const tab = fromTab(10);
-  await service.capture({ operation: 'contentPageQuery', body: content([tweet({ id: '1', createdAt: day0 })]) }, tab);
-  await wait(20);
-  await service.capture({ operation: 'audienceOverviewDataQuery', body: audience() }, tab);
-  await wait(20);
-  await service.capture({ operation: 'accountOverviewDailyQuery', body: overviewDaily() }, tab);
-  await wait(20);
-  await service.capture({ operation: 'notificationsQuery', body: mentions() }, fromTab(10, 'https://x.com/notifications/mentions'));
-  await wait(20);
-  assert.equal(data.xtocAnalyticsSync.lastSuccessAt, null);
-});
-
 test('diagnostics paths never name a post, and other pages are not recorded', async () => {
   const { service } = harness();
   await service.capture({ operation: 'contentPageQuery', body: content([tweet({ id: '1', createdAt: day0 })]) }, fromTab(1, 'https://x.com/i/account_analytics/content/2112458505273983418'));
@@ -300,4 +191,17 @@ test('a CSV for an account XTOC has not synced is refused, not merged elsewhere'
   await service.capture({ operation: 'contentPageQuery', body: content([tweet({ id: '1', createdAt: day0 })]) }, fromTab(1));
   const csv = 'Post id,Date,Post text,Post Link,Impressions,Likes,Engagements,Bookmarks,Shares,New follows,Replies,Reposts,Profile visits,Detail Expands,URL Clicks,Hashtag Clicks,Permalink Clicks\n9,"Fri, Oct 23, 2026",hi,https://x.com/someone_else/status/9,70,1,2,0,0,0,0,0,1,0,0,0,0';
   await assert.rejects(service.importCsv({ text: csv, accountId: ACCOUNT_ID }), /@someone_else/);
+});
+
+test('UI status contains only metadata even with a history above the Chrome message limit', async () => {
+  const largePost = { text: 'x'.repeat(280), snapshots: Array.from({ length: 20 }, (_, i) => [1794800000000 + i * 3600000, 10000 + i, 100 + i]) };
+  assert.ok(Buffer.byteLength(JSON.stringify(largePost)) * 100000 > 64 * 1024 * 1024);
+  const service = createAnalyticsService({
+    storage: { get: async () => ({}), set: async () => {} }, tabs: {},
+    repository: { accounts: async () => [{ id: '123', handle: 'fixture', counts: { posts: 100000 } }], read: async () => { throw Error('UI status must not load history'); } }
+  });
+  const result = await service.status();
+  assert.equal(result.data.accounts['123'].counts.posts, 100000);
+  assert.equal(result.data.accounts['123'].posts, undefined);
+  assert.ok(Buffer.byteLength(JSON.stringify(result)) < 1024);
 });

@@ -2,6 +2,7 @@
 // responses from x-data-tap.js and forwards them to the background, which
 // validates and stores them. Also lets the background know X was opened, so an
 // opted-in daily sync can start while the user is signed in.
+import { prepareAnalyticsWindow } from './analytics-window.js';
 import { OPERATIONS } from '../analytics/operations.js';
 
 const TAP = 'xtoc-tap';
@@ -22,16 +23,21 @@ export function initAnalyticsBridge() {
       return;
     }
     if (data.type !== 'capture') return;
-    const { operation, body } = data.capture || {};
+    const { operation, body, requestedAt, range } = data.capture || {};
     if (!KNOWN.has(operation) || !body || typeof body !== 'object') return;
     chrome.runtime
-      .sendMessage({ action: 'analytics:capture', payload: { operation, body } })
+      .sendMessage({ action: 'analytics:capture', payload: { operation, body, requestedAt, range } })
       .catch(() => {});
   }
 
   window.addEventListener('message', onMessage);
   window.postMessage({ source: BRIDGE, type: 'ready' }, location.origin);
   chrome.runtime.sendMessage({ action: 'analytics:visit' }).catch(() => {});
+  prepareAnalyticsWindow(async (action, payload) => {
+    const response = await chrome.runtime.sendMessage({ action, payload });
+    if (!response?.ok) throw new Error(response?.error || 'Sync stopped.');
+    return response.data;
+  }).catch(() => {});
 
   return {
     destroy() {
