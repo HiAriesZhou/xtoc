@@ -66,9 +66,6 @@ jobs:
         if: steps.changes.outputs.full == 'true'
         run: npm test
 
-      - name: Build Chromium, Edge and Firefox
+      - name: Build Chrome
         if: steps.changes.outputs.full == 'true'
-        run: |
-          npm run build
-          npm run build:edge
-          npm run build:firefox
+        run: npm run build
