@@ -5,6 +5,6 @@ browser:
   endpoint: http://127.0.0.1:9333
 targets:
   chrome:
-    artifact: release/xtoc-chrome-v0.10.0.zip
+    artifact: release/xtoc-chrome-v0.11.0.zip
     itemId: nbdgpckkcfkomnmdefinikjijgljgjfp
     language: English – en (default)
