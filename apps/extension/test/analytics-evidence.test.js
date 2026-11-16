@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { summary, postList, postStats } from '../src/analytics/metrics.js';
+import { summary, postList, postStats, contentPerformance } from '../src/analytics/metrics.js';
 import { digest, inboundLedger, interactionLedger, interpretationInput } from '../src/analytics/insights.js';
 const today = Date.parse('2026-11-16T12:00:00Z');
 const DAY = 86400000;
@@ -78,4 +78,17 @@ test('Markdown renders an unobserved follower metric as unavailable', async () =
  const {digestMarkdown}=await import('../src/analytics/insights.js');
  const posts={a:{...p('a',today-DAY,{Impressions:100}),kind:'reply',replyTo:{handle:'reader'}}};
  assert.match(digestMarkdown({posts},{days:7,today}),/\| @reader \| 1 \| 100 \| n\/a \|/);
+});
+
+
+test('content distribution separates missing observations from zero and exposes concentration', () => {
+ const rows = [900, 100, 0, null].map(impressions => ({stats:{impressions}}));
+ const result = contentPerformance(rows);
+ assert.deepEqual(result, {count:4, measured:3, total:1000, median:100, topShare:0.9, topFiveShare:1, withoutTop:50});
+ assert.equal(contentPerformance([{stats:{impressions:0}}]).topShare,null);
+ assert.equal(contentPerformance([{stats:{impressions:900}}]).withoutTop,null);
+ const missing = contentPerformance([{stats:{impressions:null}}]);
+ assert.equal(missing.measured,0);
+ assert.equal(missing.median,null);
+ assert.equal(missing.topShare,null);
 });

@@ -3,18 +3,17 @@
 // interpret the numbers. All numbers come from src/analytics.
 import { ANALYTICS_KEYS, accountList } from '../analytics/store.js';
 import { postList, sortPosts, summary } from '../analytics/metrics.js';
-import { digest, digestMarkdown, inboundLedger, interactionLedger, weeklyCadence } from '../analytics/insights.js';
+import { digestMarkdown, inboundLedger, interactionLedger } from '../analytics/insights.js';
 import { noteName } from '../library/obsidian.js';
 import { attachChartHover } from './analytics-charts.js';
 import {
+  findingsCard,
+  performanceCard,
   aiCard,
   audienceCard,
   coverageNote,
   breakdownCard,
-  cadenceCard,
-  digestCard,
   funnelCard,
-  halfLifeNote,
   inboundCard,
   kpiTiles,
   ledgerCard,
@@ -26,7 +25,8 @@ import {
 import { emptyState, esc, icon } from './ui.js';
 
 const PERIODS = [7, 28, 90];
-const PAGE = 25;
+const PAGE = 15;
+const SECTIONS = [['overview', 'Overview'], ['content', 'Content'], ['interactions', 'Interactions'], ['audience', 'Audience']];
 const ANALYTICS_STORAGE = Object.values(ANALYTICS_KEYS);
 
 const relative = (iso) => {
@@ -43,7 +43,7 @@ const relative = (iso) => {
 export function createAnalyticsView(ctx) {
   let main = null;
   let loaded = null; // { data, prefs, sync }
-  const view = { accountId: '', days: 28, sort: 'impressions', kind: 'all', limit: PAGE, ai: { loading: false, result: null } };
+  const view = { accountId: '', days: 28, section: 'overview', sort: 'impressions', kind: 'post', limit: PAGE, ai: { loading: false, result: null } };
 
   async function reload() {
     loaded = await ctx.rpc('analytics:load');
@@ -93,6 +93,8 @@ export function createAnalyticsView(ctx) {
   }
 
   function render() {
+    const focused = main.contains(document.activeElement) ? document.activeElement : null;
+    const focusSelector = focused?.dataset.days ? `[data-days="${focused.dataset.days}"]` : focused?.dataset.kind ? `[data-kind="${focused.dataset.kind}"]` : focused?.dataset.action ? `[data-action="${focused.dataset.action}"]` : null;
     if (!loaded) {
       main.innerHTML = '<div class="page-top"><header class="page-head"><div class="page-title"><h1>Analytics</h1></div></header></div>';
       return;
@@ -107,32 +109,32 @@ export function createAnalyticsView(ctx) {
     const s = summary(account, { days: view.days, today });
     const posts = postList(account, { days: view.days, today, kind: 'all' });
     const shown = sortPosts(view.kind === 'all' ? posts : posts.filter((p) => p.kind === view.kind), view.sort);
-    const lifeNote = halfLifeNote(posts);
+    const originals = posts.filter(p => p.kind !== 'reply');
+    const replies = posts.filter(p => p.kind === 'reply');
+    const content = view.section === 'overview'
+      ? `${kpiTiles(s)}<div class="a-overview-grid">${trendCards(s)}<div class="a-side">${findingsCard(posts, s)}${funnelCard(s.current)}</div></div>${performanceCard(originals)}${postsCard(account, sortPosts(originals), { ...view, limit: 5, preview: true })}${aiCard(view.ai, ctx.ai?.configured)}`
+      : view.section === 'content'
+        ? `<div class="a-grid-2">${performanceCard(originals)}${performanceCard(replies, 'Replies')}</div>${postsCard(account, shown, view)}${breakdownCard(posts)}`
+        : view.section === 'interactions'
+          ? `${ledgerCard(interactionLedger(account, { days: view.days, today }))}${inboundCard(inboundLedger(account, { days: view.days, today }), Boolean(account.inbound))}`
+          : `${audienceCard(account)}${timingCard(account, posts)}`;
     main.innerHTML = `
       ${header(accounts)}
       <div class="a-page">
-        ${digestCard(digest(account, { days: view.days, today }))}
-        ${coverageNote(s)}
-        ${kpiTiles(s)}
-        ${trendCards(s)}
-        ${funnelCard(s.current, s.derived)}
-        ${postsCard(account, shown, { sort: view.sort, kind: view.kind, limit: view.limit })}
-        ${lifeNote ? `<p class="hint a-life">${esc(lifeNote)}</p>` : ''}
-        ${timingCard(account, posts)}
-        ${breakdownCard(posts)}
-        ${ledgerCard(interactionLedger(account, { days: Math.max(view.days, 28), today }))}
-        ${inboundCard(inboundLedger(account, { days: Math.max(view.days, 28), today }), Boolean(account.inbound))}
-        ${audienceCard(account)}
-        ${cadenceCard(weeklyCadence(account, { today }))}
-        ${aiCard(view.ai, ctx.ai?.configured)}
+        <nav class="a-tabs" aria-label="Analytics sections">${SECTIONS.map(([key,label]) => `<button type="button" data-section="${key}" aria-current="${view.section === key ? 'page' : 'false'}">${label}</button>`).join('')}</nav>
+        <div class="a-period"><strong>${esc(s.start)} – ${esc(s.end)} · UTC</strong><span>${view.section === 'audience' ? 'Audience: latest captured X snapshot; its range is set on X.' : 'Complete days. Posts: captured lifetime results of content published in this window.'}</span></div>
+        ${view.section === 'overview' ? coverageNote(s) : ''}
+        ${content}
+        <details class="a-data-details"><summary>Data sources &amp; imports</summary>
         <section class="card a-data">
           <div class="card-head"><div><h2>Data on this device</h2><p class="subtle">${esc(`${Object.keys(account.posts || {}).length} posts and ${Object.keys(account.daily || {}).length} days stored locally for @${account.handle || account.id}.`)}</p></div>
           <div class="inline-actions"><label class="btn btn-secondary btn-sm">Import X CSV<input type="file" accept=".csv,text/csv" multiple hidden data-action="import-csv" /></label>
           <button type="button" class="btn btn-ghost-danger btn-sm" data-action="clear-account">Delete this account’s data</button></div></div>
           <p class="hint">If sync stops working, import the account overview or content CSV exported from X Analytics instead.</p>
-        </section>
+        </section></details>
       </div>`;
     attachChartHover(main);
+    if (focusSelector) main.querySelector(focusSelector)?.focus({ preventScroll: true });
   }
 
   function downloadDigest(account) {
@@ -157,9 +159,16 @@ export function createAnalyticsView(ctx) {
   }
 
   async function onClick(event) {
-    const target = event.target.closest('[data-action], [data-days], [data-kind], tr[data-post]');
+    const target = event.target.closest('[data-action], [data-days], [data-kind], [data-section], tr[data-post]');
     if (!target) return;
     const account = accountList(loaded?.data || { accounts: {} }).find((a) => a.id === view.accountId);
+    if (target.dataset.section) {
+      view.section = target.dataset.section;
+      ctx.closeDrawer();
+      render();
+      main.querySelector(`[data-section="${view.section}"]`)?.focus({ preventScroll: true });
+      return;
+    }
     if (target.dataset.days) {
       view.days = Number(target.dataset.days);
       view.limit = PAGE;
