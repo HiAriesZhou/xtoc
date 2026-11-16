@@ -173,11 +173,11 @@ function parseOverviewDaily(user) {
     for (const name of ['Follows', 'Unfollows'])
       if (values[name] !== undefined) days[key][name] = values[name];
   }
-  return { days, account: followerInfo(user) };
+  return { days, account: followerInfo(user), truncated: (user.current_time_series?.length || 0) > MAX_SERIES || (user.legacy_current_follow_metrics?.length || 0) > MAX_SERIES };
 }
 
 function parseOverviewHourly(user) {
-  return { hours: bucketEngagements(user.current_time_series, hourKey), account: followerInfo(user) };
+  return { hours: bucketEngagements(user.current_time_series, hourKey), account: followerInfo(user), truncated: (user.current_time_series?.length || 0) > MAX_SERIES };
 }
 
 const AUDIENCE_DIMENSIONS = {
@@ -280,7 +280,8 @@ function parseContent(user) {
   return {
     posts: rows.map(parsePost).filter(Boolean),
     dropped: droppedRows(rows),
-    rowCount: rows.length, // before unreadable rows are dropped; compared with X's page limit
+    rowCount: Array.isArray(user.tweets_results) ? user.tweets_results.length : 0,
+    truncated: (user.tweets_results?.length || 0) > MAX_POSTS,
     profile: {
       handle: str(user.core?.screen_name, 15),
       name: str(user.core?.name, 100),

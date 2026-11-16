@@ -40,21 +40,21 @@ test('content captures set the profile and record growth snapshots only when num
   assert.deepEqual(post.snapshots.map((s) => s[1]), [100, 250]);
 });
 
-test('snapshots stay bounded and keep the first and latest', () => {
+test('snapshots retain every changed observation, including matched-age history', () => {
   let state = emptyAnalytics();
   for (let i = 0; i < 60; i++) {
     state = apply(state, 'contentPageQuery', content([tweet({ id: '1', createdAt: day0, impressions: 100 + i })]), { now: day0 + i * 3600000 });
   }
   const snapshots = state.accounts[ACCOUNT_ID].posts['1'].snapshots;
-  assert.ok(snapshots.length <= 40);
+  assert.equal(snapshots.length, 60);
   assert.equal(snapshots[0][1], 100);
   assert.equal(snapshots.at(-1)[1], 159);
 });
 
-test('hourly and heatmap data expire, audience is replaced', () => {
+test('hourly and heatmap history remain available, audience is refreshed', () => {
   const now = day0 + 100 * 86400000;
   let state = apply(emptyAnalytics(), 'accountOverviewHourlyQuery', overviewHourly(), { now });
-  assert.deepEqual(state.accounts[ACCOUNT_ID].hourly, {});
+  assert.ok(Object.keys(state.accounts[ACCOUNT_ID].hourly).length > 0);
   state = apply(state, 'audienceOverviewDataQuery', audience(), { now: day0 + 86400000 });
   assert.equal(state.accounts[ACCOUNT_ID].audience.capturedAt, day0 + 86400000);
   assert.equal(state.accounts[ACCOUNT_ID].heatmap['2026-10-20T00'].Impressions, 77);

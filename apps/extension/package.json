@@ -2,7 +2,7 @@
   "private": true,
   "name": "twitter-toc-extension",
   "description": "Navigate long X articles with a table of contents, and save posts, articles and passages to a local library you can export.",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "license": "MIT",
   "type": "module",
   "author": {
@@ -21,9 +21,9 @@
     "prebuild:zip": "npm run check:store-assets",
     "build:zip": "npm run build && node tooling/package-release.mjs"
   },
-  "dependencies": {},
   "devDependencies": {
-    "extension": "^3.7.0"
+    "extension": "^3.7.0",
+    "fake-indexeddb": "^6.2.8"
   },
   "packageManager": "npm@10.8.2"
 }

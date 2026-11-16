@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/HiAriesZhou/xtoc/releases"><img src="https://img.shields.io/badge/version-0.11.0-blue" alt="Version 0.11.0"></a>
+  <a href="https://github.com/HiAriesZhou/xtoc/releases"><img src="https://img.shields.io/badge/version-0.12.0-blue" alt="Version 0.12.0"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License"></a>
   <a href="https://chromewebstore.google.com/detail/nbdgpckkcfkomnmdefinikjijgljgjfp?utm_source=item-share-cb"><img src="https://img.shields.io/chrome-web-store/size/nbdgpckkcfkomnmdefinikjijgljgjfp" alt="Chrome Web Store"></a>
 </p>
@@ -46,7 +46,7 @@ https://github.com/user-attachments/assets/b107995f-3b2a-4432-9530-48a93c886aa3
 - **书签**：在 Popup 点击 **Save to Bookmarks** 保存当前文章或帖子，或从 X 书签页导入。导入只读取已加载的预览，不会修改你的 X 书签。
   再次导入时，可在同一账号、同一列表的上次导入位置停止；在导入菜单中选择 **Scan all bookmarks** 可检查更早的书签。首次导入、无法识别列表或导入记录失效时会完整扫描；页面加载失败时仍可能需要重试。在书签页打开 XTOC 弹窗，也能使用同样的导入按钮并查看进度，关闭导入条后仍可从这里重新开始。导入时请保持该标签页可见；标签页在后台时导入会暂停等待。
 - **数据分析**：面向 X Premium 账号，把你自己的 X Analytics 整理得更易读：本期概要、曝光与互动趋势、新增关注与取关、独立的账号活动指标、内容表现中位数和最高单帖占比、你的帖子和受众最活跃的时段、哪些形式效果更好、回复哪些账号最有回报、已捕获的双向互动和受众构成。页面分为概览、内容、互动和受众。日期范围使用完整 UTC 日；数据不完整时不做周期比较，缺失指标不当作零。帖子显示已捕获的累计表现；相对分数需要至少五条同类型历史帖子在发布后 48–50 小时的记录。
-  点击 **Sync from X** 后，XTOC 会在同一浏览器（你已登录 X）的后台标签页打开 X Analytics，由 X 自己加载数据，再以同样方式读取你的 Mentions 时间线；XTOC 保留这些响应的副本并关闭标签页。它不会自己发送请求，也不需要 API Key。如果同步失效，也可以导入从 X Analytics 导出的账号总览和内容 CSV。打开 X 时每日自动同步为可选项，默认关闭。多次同步会积累比 X 显示更长的历史，并记录每条帖子的增长过程；打开某条帖子在 X 上的分析页，还会补充它前 48 小时的数据和受众。可以下载 Markdown 周报；配置 AI 后，也可以请 AI 简要解读，AI 只会收到汇总数字。
+  点击 **Sync from X** 后，XTOC 会在同一浏览器（你已登录 X）的后台标签页打开 X Analytics，由 X 自己加载数据，再以同样方式读取你的 Mentions 时间线；XTOC 保留这些响应的副本并关闭标签页。它不会自己发送请求，也不需要 API Key。如果同步失效，也可以导入从 X Analytics 导出的账号总览和内容 CSV。同步按可恢复的日期窗口检查历史：先补最近 56 天的每日数据，再尝试 X 控件允许的一年内历史；不完整窗口会标记，缺失值不当作零。设置中可选择手动、访问 X 时每日同步，或每六小时后台更新；自动更新默认关闭，原有选择不会自动升级。后台标签页短暂出现但不抢焦点，暂停会停止自动任务。历史保存在本机 IndexedDB，迁移时保留旧存储副本。多次同步会积累比 X 显示更长的历史，并记录每条帖子的增长过程；打开某条帖子在 X 上的分析页，还会补充它前 48 小时的数据和受众。可以下载 Markdown 周报；配置 AI 后，也可以请 AI 简要解读，AI 只会收到汇总数字。
 - **更新后无需刷新**：安装或更新 XTOC 后，已打开的 X 标签页可以直接继续使用。
 
 从 Popup 或目录菜单打开 **Library**，包含四个页面：

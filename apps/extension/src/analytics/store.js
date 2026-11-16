@@ -7,18 +7,12 @@ import { dayKey } from './parse.js';
 export const ANALYTICS_KEYS = {
   data: 'xtocAnalytics',
   prefs: 'xtocAnalyticsPrefs', // { autoSync }
-  sync: 'xtocAnalyticsSync' // last sync status
+  sync: 'xtocAnalyticsSync', // scheduler status and resumable queue
+  revision: 'xtocAnalyticsRevision' // IndexedDB invalidation signal
 };
 
 const VERSION = 1;
-const HOURLY_KEEP_DAYS = 60;
-const HEATMAP_KEEP_DAYS = 35;
-const MAX_SNAPSHOTS = 40;
 const MAX_ACCOUNTS = 10;
-const MAX_INBOUND = 3000;
-const MAX_POST_DETAILS = 200;
-const MAX_POSTS_PER_ACCOUNT = 10000;
-const DAY_MS = 86400000;
 const RESERVED = ['__proto__', 'constructor', 'prototype'];
 
 export const emptyAnalytics = () => ({ version: VERSION, accounts: {} });
@@ -34,16 +28,6 @@ export function readAnalytics(raw) {
   );
   return { version: VERSION, accounts };
 }
-
-const keepRecent = (map, keepDays, now, keyMs) =>
-  Object.fromEntries(
-    Object.entries(map).filter(([key]) => {
-      const ms = keyMs(key);
-      return Number.isFinite(ms) && now - ms <= keepDays * DAY_MS;
-    })
-  );
-
-const hourMs = (key) => Date.parse(`${key}:00:00Z`);
 
 // Per metric, the larger value. CSV exports can be older than a sync, and
 // X's totals only grow, so an import never lowers a synced number.
@@ -65,21 +49,10 @@ function mergeBuckets(current = {}, incoming = {}, keepLarger = false) {
 // Snapshots record how a post's numbers grew between syncs:
 // [capturedAt, impressions, engagements, follows, profileVisits].
 function addSnapshot(snapshots = [], metrics, at) {
-  const row = [at, metrics.Impressions || 0, metrics.Engagements || 0, metrics.Follows || 0, metrics.ProfileVisits || 0];
+  const row = [at, metrics.Impressions ?? null, metrics.Engagements ?? null, metrics.Follows ?? null, metrics.ProfileVisits ?? null];
   const last = snapshots.at(-1);
   if (last && last.slice(1).every((value, i) => value === row[i + 1])) return snapshots;
-  const next = [...snapshots, row];
-  if (next.length <= MAX_SNAPSHOTS) return next;
-  // Thin the middle, keep the first and the most recent ones.
-  return [next[0], ...next.slice(1, -10).filter((_, i) => i % 2 === 1), ...next.slice(-10)];
-}
-
-// Keeps the newest posts when an account exceeds the cap.
-function capPosts(posts) {
-  const list = Object.values(posts);
-  if (list.length <= MAX_POSTS_PER_ACCOUNT) return posts;
-  const kept = list.sort((a, b) => b.createdAt - a.createdAt).slice(0, MAX_POSTS_PER_ACCOUNT);
-  return Object.fromEntries(kept.map((post) => [post.id, post]));
+  return [...snapshots, row];
 }
 
 function mergePosts(current = {}, posts, now, fromCsv = false) {
@@ -102,26 +75,22 @@ function mergePosts(current = {}, posts, now, fromCsv = false) {
   return merged;
 }
 
-// Replies and mentions by others, newest kept; the author's own tweets are skipped.
+// Replies and mentions by others, the author's own tweets are skipped.
 function mergeInbound(current = {}, mentions, ownHandle) {
   const own = (ownHandle || '').toLowerCase();
   const merged = { ...current };
   for (const item of mentions) if (item.handle !== own) merged[item.id] = item;
-  const list = Object.values(merged);
-  if (list.length <= MAX_INBOUND) return merged;
-  return Object.fromEntries(list.sort((a, b) => b.createdAt - a.createdAt).slice(0, MAX_INBOUND).map((item) => [item.id, item]));
+  return merged;
 }
 
-// Per-post details from a post's analytics page; the most recent 200 posts kept.
+// Per-post details from a post's analytics page; retained until user deletion.
 const DETAIL_FIELD = { postDetailsProviderFirst48HoursDataQuery: 'first48', postDetailsProviderLast48HoursOrganicDataQuery: 'last48', postDetailsProviderAudienceQuery: 'audience' };
 
 function mergePostDetail(current = {}, parsed, now) {
   const field = DETAIL_FIELD[parsed.operation];
   const value = parsed.operation === OPERATIONS.postAudience ? parsed.audience : parsed.series;
   const merged = { ...current, [parsed.postId]: { ...current[parsed.postId], [field]: value, capturedAt: now } };
-  const entries = Object.entries(merged);
-  if (entries.length <= MAX_POST_DETAILS) return merged;
-  return Object.fromEntries(entries.sort((a, b) => b[1].capturedAt - a[1].capturedAt).slice(0, MAX_POST_DETAILS));
+  return merged;
 }
 
 function mergeFollowers(current = {}, info, now) {
@@ -145,7 +114,7 @@ function applyToAccount(account, parsed, now, source) {
       next.daily = mergeBuckets(account.daily, parsed.days, fromCsv);
       break;
     case OPERATIONS.overviewHourly:
-      next.hourly = keepRecent(mergeBuckets(account.hourly, parsed.hours), HOURLY_KEEP_DAYS, now, hourMs);
+      next.hourly = mergeBuckets(account.hourly, parsed.hours);
       break;
     case OPERATIONS.audience:
       // X's audience page can send several queries with different dimensions;
@@ -155,10 +124,10 @@ function applyToAccount(account, parsed, now, source) {
         ...Object.fromEntries(Object.entries(parsed.audience).filter(([, groups]) => Object.keys(groups || {}).length)),
         capturedAt: now
       };
-      next.heatmap = keepRecent(mergeBuckets(account.heatmap, parsed.heatmap), HEATMAP_KEEP_DAYS, now, hourMs);
+      next.heatmap = mergeBuckets(account.heatmap, parsed.heatmap);
       break;
     case OPERATIONS.content:
-      next.posts = capPosts(mergePosts(account.posts, parsed.posts, now, fromCsv));
+      next.posts = mergePosts(account.posts, parsed.posts, now, fromCsv);
       if (parsed.profile?.handle) {
         next.handle = parsed.profile.handle;
         next.name = parsed.profile.name;

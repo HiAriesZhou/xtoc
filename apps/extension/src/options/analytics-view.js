@@ -1,6 +1,7 @@
 // Analytics page: reads the stored analytics, renders the sections and lets
 // the user sync from X, change the period, export a digest or ask AI to
 // interpret the numbers. All numbers come from src/analytics.
+import { createAnalyticsRepository } from '../analytics-db.js';
 import { ANALYTICS_KEYS, accountList } from '../analytics/store.js';
 import { postList, sortPosts, summary } from '../analytics/metrics.js';
 import { digestMarkdown, inboundLedger, interactionLedger } from '../analytics/insights.js';
@@ -42,20 +43,33 @@ const relative = (iso) => {
 
 export function createAnalyticsView(ctx) {
   let main = null;
+  const repository = createAnalyticsRepository({ storage: chrome.storage.local });
+  let reloadId = 0;
   let loaded = null; // { data, prefs, sync }
   const view = { accountId: '', days: 28, section: 'overview', sort: 'impressions', kind: 'post', limit: PAGE, ai: { loading: false, result: null } };
 
   async function reload() {
-    loaded = await ctx.rpc('analytics:load');
-    const accounts = accountList(loaded.data);
-    if (!accounts.some((a) => a.id === view.accountId)) view.accountId = accounts[0]?.id || '';
+    const id = ++reloadId;
+    const next = await ctx.rpc('analytics:load');
+    const accounts = accountList(next.data);
+    if (!accounts.some(a => a.id === view.accountId)) view.accountId = accounts[0]?.id || '';
+    if (view.accountId) {
+      const data = await repository.read({ accountId: view.accountId, since: Date.now() - 181 * 86400000 });
+      next.data.accounts[view.accountId] = data.accounts[view.accountId];
+    }
+    if (id === reloadId) loaded = next;
   }
 
   function syncLine(sync) {
-    if (sync.running) return `<p class="a-sync is-running" role="status">${icon('import', 14)} Syncing from X Analytics in a background tab…</p>`;
-    if (sync.error) return `<p class="a-sync is-error" role="status">${esc(sync.error)}${sync.lastSuccessAt ? ` Last successful sync ${esc(relative(sync.lastSuccessAt))}.` : ''}</p>`;
-    if (sync.lastSuccessAt) return `<p class="a-sync">Synced ${esc(relative(sync.lastSuccessAt))}${loaded.prefs.autoSync ? ' · daily sync on' : ''}</p>`;
-    return '';
+    const q = sync.accounts?.[view.accountId] || sync.accounts?.pending || {};
+    const checked = Object.keys(q.windows || {}).length;
+    const pending = q.pending?.length || 0;
+    const partial = Object.values(q.windows || {}).filter(w => w.status === 'partial' || w.status === 'unavailable').length;
+    const status = sync.running ? 'Syncing in an inactive tab' : q.paused ? 'Sync paused' : pending ? 'History sync queued' : 'Sync idle';
+    const freshness = q.lastCaptureAt ? `Last capture ${relative(new Date(q.lastCaptureAt).toISOString())}` : sync.lastSuccessAt ? `Last capture ${relative(sync.lastSuccessAt)}` : 'No captures yet';
+    return `<p class="a-sync" role="status">${esc(status)} · ${esc(freshness)}${loaded.prefs.mode === 'background' ? ' · updates every 6 hours' : ''}</p>
+      ${checked || pending ? `<p class="hint a-sync-detail">${checked} windows checked · ${pending} queued${partial ? ` · ${partial} with gaps or limits` : ''}. Checked windows do not imply complete metrics.</p>` : ''}
+      ${q.error || sync.error ? `<p class="a-sync is-error">${esc(q.error || sync.error)}</p>` : ''}`;
   }
 
   function header(accounts) {
@@ -76,10 +90,11 @@ export function createAnalyticsView(ctx) {
           <div class="inline-actions">
             ${accounts.length ? `<div class="seg" role="group" aria-label="Period">${PERIODS.map((d) => `<button type="button" class="seg-btn" data-days="${d}" aria-pressed="${view.days === d}">${d}D</button>`).join('')}</div>` : ''}
             ${accounts.length ? `<button type="button" class="btn btn-secondary" data-action="digest">${icon('download', 15)}Digest</button>` : ''}
+            <button type="button" class="btn btn-secondary" data-action="pause-sync">Pause sync</button>
             <button type="button" class="btn btn-primary" data-action="sync"${running ? ' disabled' : ''}>${running ? 'Syncing…' : 'Sync from X'}</button>
           </div>
         </header>
-        ${syncLine(loaded.sync)}
+        <div class="a-sync-wrap">${syncLine(loaded.sync)}</div>
       </div>`;
   }
 
@@ -89,7 +104,7 @@ export function createAnalyticsView(ctx) {
       'See your X Analytics, explained',
       'Requires X Premium. Sync opens X Analytics in a background tab of this browser, where you are signed in, and keeps a copy on this device. Sync uploads nothing.'
     )}
-      <p class="hint a-empty-note">First sync reads the last 12 weeks of posts. Daily totals start with the 7 days X sends; each later sync adds days. Turn on daily sync in Settings to keep them continuous.</p>`;
+      <p class="hint a-empty-note">Sync checks history in date windows, prioritizing the last 56 daily totals. It continues in small batches until complete or paused. Enable updates every 6 hours in Settings to keep recent data fresh.</p>`;
   }
 
   function render() {
@@ -127,7 +142,7 @@ export function createAnalyticsView(ctx) {
         ${content}
         <details class="a-data-details"><summary>Data sources &amp; imports</summary>
         <section class="card a-data">
-          <div class="card-head"><div><h2>Data on this device</h2><p class="subtle">${esc(`${Object.keys(account.posts || {}).length} posts and ${Object.keys(account.daily || {}).length} days stored locally for @${account.handle || account.id}.`)}</p></div>
+          <div class="card-head"><div><h2>Data on this device</h2><p class="subtle">${esc(`${account.counts?.posts ?? Object.keys(account.posts || {}).length} posts and ${account.counts?.daily ?? Object.keys(account.daily || {}).length} days stored locally for @${account.handle || account.id}.`)}</p></div>
           <div class="inline-actions"><label class="btn btn-secondary btn-sm">Import X CSV<input type="file" accept=".csv,text/csv" multiple hidden data-action="import-csv" /></label>
           <button type="button" class="btn btn-ghost-danger btn-sm" data-action="clear-account">Delete this account’s data</button></div></div>
           <p class="hint">If sync stops working, import the account overview or content CSV exported from X Analytics instead.</p>
@@ -189,8 +204,11 @@ export function createAnalyticsView(ctx) {
     if (action === 'sync') {
       loaded.sync = { ...loaded.sync, running: true, error: null };
       render();
-      await ctx.rpc('analytics:sync');
+      await ctx.rpc('analytics:sync', { accountId: view.accountId });
       ctx.toast('Syncing in a background tab. Keep this browser signed in to X.');
+    } else if (action === 'pause-sync') {
+      await ctx.rpc('analytics:pause');
+      await reload(); render();
     } else if (action === 'more-posts') {
       view.limit += PAGE;
       render();
@@ -224,12 +242,13 @@ export function createAnalyticsView(ctx) {
     }
   }
 
-  function onChange(event) {
+  async function onChange(event) {
     const action = event.target.dataset.action;
     if (action === 'import-csv') return ctx.guard(() => importFiles(event.target))();
     if (action === 'sort') view.sort = event.target.value;
     if (action === 'account') {
       view.accountId = event.target.value;
+      await reload();
       view.ai = { loading: false, result: null };
     }
     if (action === 'sort' || action === 'account') render();
@@ -244,18 +263,29 @@ export function createAnalyticsView(ctx) {
   }
 
   // Captures and sync progress arrive while the page is open.
-  chrome.storage.onChanged.addListener(async (changes, area) => {
+  let reloadTimer;
+  chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local' || location.hash !== '#analytics' || !main) return;
-    if (!Object.keys(changes).some((key) => ANALYTICS_STORAGE.includes(key))) return;
-    await reload();
-    if (!ctx.isDrawerOpen()) render();
+    if (!Object.keys(changes).some(key => ANALYTICS_STORAGE.includes(key))) return;
+    if (changes[ANALYTICS_KEYS.revision] || changes[ANALYTICS_KEYS.data]) {
+      clearTimeout(reloadTimer);
+      reloadTimer = setTimeout(() => ctx.guard(async () => { await reload(); if (location.hash === '#analytics' && !ctx.isDrawerOpen()) render(); })(), 500);
+    } else ctx.guard(async () => {
+      const next = await ctx.rpc('analytics:load');
+      if (!loaded || location.hash !== '#analytics') return;
+      loaded.sync = next.sync; loaded.prefs = next.prefs;
+      const line = main.querySelector('.a-sync-wrap');
+      if (line) line.innerHTML = syncLine(next.sync);
+      const button = main.querySelector('[data-action="sync"]');
+      if (button) { button.disabled = Boolean(next.sync.running); button.textContent = next.sync.running ? 'Syncing…' : 'Sync from X'; }
+    })();
   });
 
   return {
     async render(container) {
       main = container;
       main.onclick = ctx.guard(onClick);
-      main.onchange = onChange;
+      main.onchange = ctx.guard(onChange);
       main.oninput = null;
       main.onkeydown = onKeydown;
       render();

@@ -50,15 +50,17 @@ export function createSettingsView(ctx) {
   async function showAnalyticsPrefs() {
     try {
       const { prefs } = await ctx.rpc('analytics:load');
-      main.querySelector('[data-action="auto-sync"]').checked = prefs.autoSync === true;
+      const input = main.querySelector('[data-action="sync-mode"]');
+      input.value = prefs.mode || (prefs.autoSync ? 'visit' : 'manual');
+      input.disabled = false;
     } catch {
       // Background unavailable; the toggle stays off.
     }
   }
 
-  async function setAutoSync(autoSync) {
-    await ctx.rpc('analytics:prefs', { autoSync });
-    ctx.toast(autoSync ? 'Daily sync is on. It runs the next time you open X.' : 'Daily sync is off.');
+  async function setSyncMode(mode) {
+    try { await ctx.rpc('analytics:prefs', { mode }); ctx.toast(mode === 'background' ? 'Background updates enabled. You can pause them in Analytics.' : 'Automatic update preference saved.'); }
+    finally { await showAnalyticsPrefs(); }
   }
 
   async function downloadDiagnostics() {
@@ -89,8 +91,11 @@ export function createSettingsView(ctx) {
       <section class="card" id="analyticsCard">
         <div class="card-head"><h2>Analytics</h2></div>
         <p class="subtle">Sync reads your own X Analytics (X Premium) by opening its pages in a background tab of this browser. Data stays on this device.</p>
-        <label class="check-row"><input class="check" type="checkbox" data-action="auto-sync" />
-          <span>Sync daily when I open X<small>At most once a day, only while X is open and you are signed in. Off by default.</small></span></label>
+        <label class="sync-preference"><span>Automatic updates<small>Inactive X tabs may briefly appear. They do not take focus. Browser sleep delays updates; missed runs are combined on return.</small></span>
+          <select class="input" data-action="sync-mode" aria-label="Automatic analytics updates" disabled>
+            <option value="manual">Manual only</option><option value="visit">Daily when I open X</option><option value="background">Every 6 hours while Chrome is running</option>
+          </select></label>
+        <p class="hint">Off by default. Existing daily-on-visit preferences stay unchanged. Sync reads only the selected signed-in account, saves history locally, and stops if login or account access changes.</p>
         <div class="inline-actions start"><button class="btn btn-ghost-danger" type="button" data-action="clear-analytics">Delete all analytics data</button></div>
       </section>
       <section class="card" id="sampleData" hidden>
@@ -113,7 +118,7 @@ export function createSettingsView(ctx) {
       if (action) ctx.guard(() => runSeed(action === 'seed-remove' ? 'remove' : 'load'))();
     };
     main.onchange = (event) => {
-      if (event.target.matches('[data-action="auto-sync"]')) ctx.guard(() => setAutoSync(event.target.checked))();
+      if (event.target.matches('[data-action="sync-mode"]')) ctx.guard(() => setSyncMode(event.target.value))();
     };
     showAnalyticsPrefs();
     main.oninput = null;

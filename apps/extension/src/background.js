@@ -7,7 +7,7 @@ import { createVault, idbStore, memoryStore } from './library/key-vault.js';
 import { aiPermissions } from './library/ai-permissions.js';
 import { IMPORT_KEY, importStatus, nextCheckpoints, usableCheckpoint, validScope } from './library/bookmark-import.js';
 import { createAnalyticsService } from './analytics-service.js';
-import { ANALYTICS_KEYS, readAnalytics } from './analytics/store.js';
+import { ALARM_NAME } from './analytics/schedule.js';
 import { interpretationInput } from './analytics/insights.js';
 import { generateInterpretation } from './library/ai.js';
 
@@ -208,7 +208,7 @@ async function runAI(action, payload) {
       throw new Error('API permission was removed. Save the AI settings again.');
     }
     if (action === 'analytics:interpret') {
-      const data = readAnalytics((await chrome.storage.local.get(ANALYTICS_KEYS.data))[ANALYTICS_KEYS.data]);
+      const data = await analytics.readAccount(payload.accountId);
       const account = data.accounts[payload.accountId];
       if (!account) throw new Error('No analytics for this account yet.');
       timer = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
@@ -263,6 +263,10 @@ async function dispatch(message, sender) {
     if (!fromXPage(sender)) throw new Error('Saving must start on X.');
     return transaction((state) => mutate(state, action.slice('library:'.length), payload));
   }
+  if (action.startsWith('analytics:window')) {
+    if (!fromXPage(sender)) throw new Error('Sync controls must come from X.');
+    return analytics.window(action, payload, sender);
+  }
   if (action === 'analytics:capture' || action === 'analytics:visit' || action === 'analytics:seen') {
     if (!fromXPage(sender)) throw new Error('Analytics data must come from X.');
     if (action === 'analytics:seen') return analytics.seen(payload, sender);
@@ -308,8 +312,9 @@ async function dispatch(message, sender) {
     requests.get(payload.requestId)?.abort();
     return {};
   }
-  if (action === 'analytics:load') return analytics.load();
-  if (action === 'analytics:sync') return analytics.sync();
+  if (action === 'analytics:load') return analytics.status();
+  if (action === 'analytics:pause') return analytics.pause();
+  if (action === 'analytics:sync') return analytics.sync(payload);
   if (action === 'analytics:prefs') return analytics.setPrefs(payload);
   if (action === 'analytics:clear') return analytics.clear(payload);
   if (action === 'analytics:diagnostics') return analytics.diagnostics();
@@ -358,3 +363,8 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
   );
   return true;
 });
+
+// Recreate a lost alarm at worker startup without keeping the worker alive.
+chrome.alarms?.onAlarm.addListener(alarm => { if (alarm.name === ALARM_NAME) analytics.tick().catch(() => {}); });
+chrome.runtime.onStartup?.addListener(() => analytics.initialize().catch(() => {}));
+analytics.initialize().catch(() => {});

@@ -437,3 +437,8 @@ textarea.input { resize: vertical; line-height: 1.5; }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
+
+/* The update mode stays readable at narrow Settings widths. */
+.sync-preference { display: grid; gap: 8px; font-size: 13px; font-weight: 600; }
+.sync-preference small { display: block; margin-top: 4px; color: var(--text-muted); font-size: 12px; font-weight: 400; }
+.sync-preference select { width: 100%; max-width: 380px; }
