@@ -6,14 +6,14 @@ const active = [];
 afterEach(async () => { for (const runner of active.splice(0)) await runner.pause(); });
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function until(fn) { for (let i = 0; i < 100; i++) { if (fn()) return; await wait(5); } assert.fail('condition did not settle'); }
-function harness({ mode = 'manual', tasks, now = Date.parse('2026-11-16T12:00:00Z'), data = {}, sessions = {}, tabMap = new Map(), stepTimeoutMs = 10000, failNavigation = false } = {}) {
+function harness({ mode = 'manual', tasks, now = Date.parse('2026-11-16T12:00:00Z'), data = {}, sessions = {}, tabMap = new Map(), stepTimeoutMs = 10000, failNavigation = false, failCreation = false } = {}) {
   let clock = now, nextId = 10;
   const events = { updated: [], removed: [] }, log = [], scheduled = new Map();
   const area = values => ({ get: async key => ({ [key]: structuredClone(values[key]) }), set: async patch => Object.assign(values, structuredClone(patch)), remove: async key => { delete values[key]; } });
   data.xtocAnalyticsPrefs ||= { mode, accountId: '123' };
   data.xtocAnalyticsSync ||= { version: 2, activeAccountId: '123', accounts: { '123': { pending: tasks || [], windows: {}, failures: 0 } } };
   const tabs = {
-    create: async options => { log.push(['create', options]); const tab = { id: nextId++, ...options }; tabMap.set(tab.id, tab); return tab; },
+    create: async options => { log.push(['create', options]); if (failCreation) throw Error('creation failed'); const tab = { id: nextId++, ...options }; tabMap.set(tab.id, tab); return tab; },
     update: async (id, options) => { log.push(['update', id, options]); if (failNavigation === true || typeof failNavigation === 'number' && log.filter(e => e[0] === 'update').length === failNavigation) throw Error('navigation failed'); Object.assign(tabMap.get(id), options); },
     get: async id => { if (!tabMap.has(id)) throw Error('closed'); return tabMap.get(id); },
     remove: async id => { log.push(['remove', id]); tabMap.delete(id); events.removed.forEach(fn => fn(id)); },
@@ -68,7 +68,7 @@ test('coverage distinguishes missing, zero, dropped, and capped responses', () =
 test('single inactive tab and durable queue advance only on verified capture', async () => {
   const h = harness({ tasks: [task(), task('2026-11-14')] });
   await Promise.all([h.runner.start(), h.runner.start()]);
-  assert.deepEqual(h.log[0], ['create', { url: 'about:blank', active: false }]);
+  assert.deepEqual(h.log[0], ['create', { url: task().url, active: false }]);
   assert.equal(h.log.filter(e => e[0] === 'create').length, 1);
   assert.equal(h.scheduled.get(ALARM_NAME).when, h.now() + BATCH_MS);
   const { from, task: current } = await h.prepare();
@@ -98,7 +98,7 @@ test('each batch stops at eight pages and resumes in fifteen minutes', async () 
   const tasks = Array.from({ length: 9 }, (_, i) => task(`2026-11-${String(15 - i).padStart(2, '0')}`));
   const h = harness({ tasks }); await h.runner.start();
   for (let i = 0; i < 8; i++) await h.complete();
-  assert.equal(h.log.filter(e => e[0] === 'update').length, 8);
+  assert.equal(h.log.filter(e => e[0] === 'update' || e[0] === 'create').length, 8);
   assert.equal(h.q().pending.length, 1); assert.equal(h.scheduled.get(ALARM_NAME).when, h.now() + CONTINUE_DELAY);
   h.advance(CONTINUE_DELAY); await h.runner.tick(); assert.equal(h.runner.isRunning(), true);
   await h.complete(); assert.equal(h.q().pending.length, 0);
@@ -186,8 +186,8 @@ test('spent daily budget does not create an orphan blank tab', async () => {
   assert.equal(h.q().nextAttemptAt, Date.parse('2026-11-17T00:00:00Z'));
 });
 
-test('failed first navigation closes its owned blank tab', async () => {
-  const h = harness({ tasks: [task()], failNavigation: true }); await h.runner.start();
+test('failed tab creation preserves work without creating an orphan', async () => {
+  const h = harness({ tasks: [task()], failCreation: true }); await h.runner.start();
   assert.equal(h.runner.isRunning(), false);
   assert.equal(h.tabMap.size, 0);
   assert.equal(h.q().errorKind, 'network');
@@ -197,7 +197,7 @@ test('failed first navigation closes its owned blank tab', async () => {
 
 test('failed subsequent navigation closes the previous controlled page', async () => {
   const audience = { id: 'audience', kind: 'audience', url: 'https://x.com/i/account_analytics/audience', expect: 'audienceOverviewDataQuery' };
-  const h = harness({ tasks: [task(), audience], failNavigation: 2 });
+  const h = harness({ tasks: [task(), audience], failNavigation: 1 });
   await h.runner.start(); await h.complete();
   assert.equal(h.runner.isRunning(), false);
   assert.equal(h.tabMap.size, 0);
@@ -212,5 +212,5 @@ test('a user-navigated sync tab is neither overwritten nor closed', async () => 
   await h.complete();
   assert.equal(h.tabMap.get(10).url, 'https://x.com/home');
   assert.equal(h.q().errorKind, 'navigation');
-  assert.equal(h.log.filter(e => e[0] === 'update').length, 1);
+  assert.equal(h.log.filter(e => e[0] === 'update').length, 0);
 });

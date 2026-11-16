@@ -90,7 +90,7 @@ export function createAnalyticsSync({ storage, session, repository, tabs, alarms
       q.error = 'Daily page budget reached. Saved progress resumes tomorrow.';
       s.error = q.error; await save(s); await schedule(s); return;
     }
-    if (tabs.get) {
+    if (run.pages > 0 && tabs.get) {
       try {
         const tab = await tabs.get(run.tabId);
         if (!samePage(tab.pendingUrl || tab.url, run.currentUrl)) return finish(s, 'Sync paused because its tab was navigated elsewhere.', 'navigation', true);
@@ -107,7 +107,7 @@ export function createAnalyticsSync({ storage, session, repository, tabs, alarms
       if (run?.task.id === task.id) await finish(await state(), 'X did not return a verified date window. Saved data is kept; retry is scheduled.', 'timeout');
     }), stepTimeoutMs);
     try {
-      await tabs.update(run.tabId, { url: task.url });
+      if (run.pages > 1) await tabs.update(run.tabId, { url: task.url });
       run.currentUrl = task.url;
       await session?.set({ [OWN_TAB]: { tabId: run.tabId, token: run.token, url: task.url } });
       await schedule(s);
@@ -145,9 +145,9 @@ export function createAnalyticsSync({ storage, session, repository, tabs, alarms
       await save(s); await schedule(s); return { running: false };
     }
     let tab;
-    try { tab = await tabs.create({ url: 'about:blank', active: false }); }
+    try { tab = await tabs.create({ url: q.pending[0].url, active: false }); }
     catch { await finish(s, 'Could not open an inactive X tab.', 'network'); return { running: false }; }
-    run = { tabId: tab.id, currentUrl: 'about:blank', token: crypto.randomUUID(), accountId: id, startedAt: now(), pages: 0, trigger };
+    run = { tabId: tab.id, currentUrl: q.pending[0].url, token: crypto.randomUUID(), accountId: id, startedAt: now(), pages: 0, trigger };
     s.running = true;
     await next(s);
     return { running: Boolean(run) };
