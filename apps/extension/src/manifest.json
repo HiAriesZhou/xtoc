@@ -20,7 +20,7 @@
     "default_popup": "popup/index.html",
     "default_title": "XTOC"
   },
-  "options_page": "options/index.html",
+  "options_page": "settings/index.html",
   "permissions": [
     "contextMenus",
     "activeTab",

@@ -1,3 +1,4 @@
+import { viewAccount } from '../analytics/view-account.js';
 // Analytics page: reads the stored analytics, renders the sections and lets
 // the user sync from X, change the period, export a digest or ask AI to
 // interpret the numbers. All numbers come from src/analytics.
@@ -52,7 +53,9 @@ export function createAnalyticsView(ctx) {
     const id = ++reloadId;
     const next = await ctx.rpc('analytics:load');
     const accounts = accountList(next.data);
-    if (!accounts.some(a => a.id === view.accountId)) view.accountId = accounts[0]?.id || '';
+    const remembered = (await chrome.storage.local.get('xtocAnalyticsViewAccount')).xtocAnalyticsViewAccount;
+    view.accountId = viewAccount(accounts, { query:new URLSearchParams(location.search).get('account'), remembered, current:view.accountId });
+    await chrome.storage.local.set({ xtocAnalyticsViewAccount:view.accountId });
     if (view.accountId) {
       const data = await repository.read({ accountId: view.accountId, since: Date.now() - 181 * 86400000 });
       next.data.accounts[view.accountId] = data.accounts[view.accountId];
@@ -140,13 +143,7 @@ export function createAnalyticsView(ctx) {
         <div class="a-period"><strong>${esc(s.start)} – ${esc(s.end)} · UTC</strong><span>${view.section === 'audience' ? 'Audience: latest captured X snapshot; its range is set on X.' : 'Complete days. Posts: captured lifetime results of content published in this window.'}</span></div>
         ${view.section === 'overview' ? coverageNote(s) : ''}
         ${content}
-        <details class="a-data-details"><summary>Data sources &amp; imports</summary>
-        <section class="card a-data">
-          <div class="card-head"><div><h2>Data on this device</h2><p class="subtle">${esc(`${account.counts?.posts ?? Object.keys(account.posts || {}).length} posts and ${account.counts?.daily ?? Object.keys(account.daily || {}).length} days stored locally for @${account.handle || account.id}.`)}</p></div>
-          <div class="inline-actions"><label class="btn btn-secondary btn-sm">Import X CSV<input type="file" accept=".csv,text/csv" multiple hidden data-action="import-csv" /></label>
-          <button type="button" class="btn btn-ghost-danger btn-sm" data-action="clear-account">Delete this account’s data</button></div></div>
-          <p class="hint">If sync stops working, import the account overview or content CSV exported from X Analytics instead.</p>
-        </section></details>
+        <p class="hint"><a href="#data">Manage account data, CSV imports and sync</a></p>
       </div>`;
     attachChartHover(main);
     if (focusSelector) main.querySelector(focusSelector)?.focus({ preventScroll: true });
@@ -248,6 +245,8 @@ export function createAnalyticsView(ctx) {
     if (action === 'sort') view.sort = event.target.value;
     if (action === 'account') {
       view.accountId = event.target.value;
+      const url = new URL(location.href); url.searchParams.set('account', view.accountId); history.replaceState(null, '', url);
+      await chrome.storage.local.set({ xtocAnalyticsViewAccount:view.accountId });
       await reload();
       view.ai = { loading: false, result: null };
     }
@@ -265,14 +264,14 @@ export function createAnalyticsView(ctx) {
   // Captures and sync progress arrive while the page is open.
   let reloadTimer;
   chrome.storage.onChanged.addListener((changes, area) => {
-    if (area !== 'local' || location.hash !== '#analytics' || !main) return;
+    if (area !== 'local' || (location.hash && location.hash !== '#analytics') || !main) return;
     if (!Object.keys(changes).some(key => ANALYTICS_STORAGE.includes(key))) return;
     if (changes[ANALYTICS_KEYS.revision] || changes[ANALYTICS_KEYS.data]) {
       clearTimeout(reloadTimer);
-      reloadTimer = setTimeout(() => ctx.guard(async () => { await reload(); if (location.hash === '#analytics' && !ctx.isDrawerOpen()) render(); })(), 500);
+      reloadTimer = setTimeout(() => ctx.guard(async () => { await reload(); if ((!location.hash || location.hash === '#analytics') && !ctx.isDrawerOpen()) render(); })(), 500);
     } else ctx.guard(async () => {
       const next = await ctx.rpc('analytics:load');
-      if (!loaded || location.hash !== '#analytics') return;
+      if (!loaded || (location.hash && location.hash !== '#analytics')) return;
       loaded.sync = next.sync; loaded.prefs = next.prefs;
       const line = main.querySelector('.a-sync-wrap');
       if (line) line.innerHTML = syncLine(next.sync);
@@ -294,7 +293,7 @@ export function createAnalyticsView(ctx) {
       } catch (error) {
         ctx.toast(error.message, 'error');
       }
-      if (location.hash === '#analytics') render();
+      if ((!location.hash || location.hash === '#analytics')) render();
     }
   };
 }

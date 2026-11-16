@@ -66,67 +66,19 @@ const saveButton = () =>
     attrs: 'data-state="idle"'
   });
 
-function renderHeader(pinState, canSave) {
-  const pin = pinState
-    ? iconButton({
-        id: 'pinBtn',
-        name: pinState.visible ? 'unpin' : 'pin',
-        label: pinState.visible ? 'Close pop-out contents' : 'Pop out contents',
-        extraClass: pinState.visible ? 'active' : ''
-      })
-    : '';
-  return `
-    <header class="header">
-      <div class="brand"><img src="${brandIconUrl()}" alt="" width="20" height="20"><span>XTOC</span></div>
-      <div class="header-actions">
-        ${canSave ? saveButton() : ''}
-        ${iconButton({ id: 'libraryBtn', name: 'library', label: 'Library' })}
-        ${pin}
-      </div>
-    </header>`;
+function renderHeader() {
+  return `<header class="header"><div class="brand"><img src="${brandIconUrl()}" alt="" width="20" height="20">XTOC</div><button class="text-btn" data-page="settings">Settings</button></header><nav class="popup-nav" aria-label="XTOC"><button data-page="library">Library</button><button data-page="analytics">Analytics</button></nav>`;
 }
-
-function renderFooter() {
-  return `
-    <footer class="popup-footer">
-      <span>Enjoying XTOC? Give it a</span>
-      <a href="${REPOSITORY_URL}" target="_blank" rel="noopener noreferrer" aria-label="Star XTOC on GitHub">
-        ${icon('github', 15)}<span>Star</span>
-      </a>
-      <span>on GitHub ⭐</span>
-    </footer>`;
+let snapshot = null;
+function safeLink(value) { try { const url = new URL(value); return ['https:', 'http:'].includes(url.protocol) ? escapeHtml(url.href) : ''; } catch { return ''; } }
+function homeSummary() {
+  if (!snapshot) return '<p class="muted-line" role="status">Loading local summary…</p>';
+  const d = snapshot, stats = d.stats;
+  const account = d.accounts.find(a => a.id === d.accountId);
+  const num = value => value === null ? '–' : new Intl.NumberFormat('en', { notation:'compact', maximumFractionDigits:1 }).format(value);
+  const metrics = stats ? `<p class="summary-period">Last 7 complete days · UTC · ${stats.coverage}/7 days captured${stats.coverage < 7 ? ' · totals for captured days' : ''}</p><div class="summary-kpis">${stats.kpis.map(k => `<div><span>${escapeHtml(k.label)}</span><strong>${k.format === 'percent' && k.value !== null ? (k.value * 100).toFixed(2) + '%' : num(k.value)}</strong></div>`).join('')}</div>` : '<p class="muted-line">Connect your own X Premium analytics to see account performance.</p>';
+  return `<section class="home-section"><button class="section-link" data-page="library">My library <span>${d.bookmarks} bookmarks · ${d.clips} clips</span></button>${d.recent.length ? d.recent.map(item => `<a class="recent-item" href="${safeLink(item.url)}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(item.title)}"><small>${item.kind}</small><span>${escapeHtml(item.title || 'Untitled')}</span></a>`).join('') : '<p class="muted-line">Save an X post or select a passage to start your library.</p>'}</section><section class="home-section"><button class="section-link" data-page="analytics">Analytics <span>${account ? '@' + escapeHtml(account.handle || account.id) : 'Open analytics'}</span></button>${d.accounts.length > 1 ? `<select aria-label="Analytics account" id="summary-account">${d.accounts.map(a => `<option value="${a.id}" ${a.id === d.accountId ? 'selected' : ''}>@${escapeHtml(a.handle || a.id)}</option>`).join('')}</select>` : ''}${metrics}<p class="summary-period">${d.sync.running ? 'Syncing in an inactive tab' : d.sync.paused ? 'Sync paused' : d.sync.queued ? 'History queued: ' + d.sync.queued + ' windows' : d.sync.mode === 'background' ? 'Updates every 6 hours' : 'Manual / on-visit updates'}${d.sync.capturedAt ? ' · Last capture ' + new Date(d.sync.capturedAt).toLocaleString() : ''}</p>${d.sync.error ? `<p class="summary-error">${escapeHtml(d.sync.error)}</p>` : ''}<button class="text-btn" data-page="analytics" data-route="data">Data & Sync</button></section>`;
 }
-
-function renderNotice({ iconName, title, text, action = '' }) {
-  return `
-    <section class="notice">
-      <span class="notice-icon">${icon(iconName, 22)}</span>
-      <h2>${title}</h2>
-      <p>${text}</p>
-      ${action}
-    </section>`;
-}
-
-function renderToc(toc) {
-  return `
-    <p class="section-label">Contents · ${toc.length} ${toc.length === 1 ? 'section' : 'sections'}</p>
-    <ul class="toc-list">
-      ${toc
-        .map(
-          (item, index) => `
-        <li class="toc-item level-${item.level}" data-index="${index}">
-          <a href="#" class="toc-link">${escapeHtml(item.text)}</a>
-        </li>`
-        )
-        .join('')}
-    </ul>`;
-}
-
-// Shown only after the reader hid the contents beside articles.
-const renderInlineTocOff = () => `
-  <p class="muted-line inline-toc-off">Contents are hidden beside articles.
-    <button class="text-btn" id="showInlineTocBtn" type="button">Show again</button>
-  </p>`;
 
 // Bookmarks pages: import controls instead of the "no article" notice.
 const SYNC_POLL_MS = 500;
@@ -185,51 +137,14 @@ function updateSync(root, status) {
 }
 
 function bodyFor(page) {
-  if (page.kind === 'unsupported') {
-    return renderNotice({
-      iconName: 'article',
-      title: 'Open an X article',
-      text: 'XTOC works on x.com articles and posts.'
-    });
-  }
-  if (page.kind === 'unreachable') {
-    return renderNotice({
-      iconName: 'refresh',
-      title: 'Reload this tab',
-      text: 'XTOC starts with the page. Reload the tab, then open XTOC again.',
-      action: `<button class="text-btn" id="reloadBtn" type="button">Reload tab</button>`
-    });
-  }
-  if (page.kind === 'other' && page.bookmarkImport?.available) {
-    return `<div id="syncRoot">${SYNC_SKELETON}</div>`;
-  }
-  if (page.kind === 'other') {
-    return renderNotice({
-      iconName: 'timeline',
-      title: 'No article on this page',
-      text: 'Open an article for its contents, or a single post to save it to Bookmarks.'
-    });
-  }
-  if (page.kind === 'post') {
-    return '<p class="muted-line">Posts have no contents. Use the save button to keep this one in Bookmarks.</p>';
-  }
-  const contents = page.toc.length
-    ? renderToc(page.toc)
-    : '<p class="muted-line">No section headings found in this article yet.</p>';
-  return page.inlineTocOff ? `${renderInlineTocOff()}${contents}` : contents;
+  if (page.bookmarkImport?.available) return `<div id="syncRoot">${SYNC_SKELETON}</div>`;
+  if (page.kind === 'article' || page.kind === 'post') return `<section class="current-page"><p class="section-label">Current ${page.kind}</p><p class="current-title" title="${escapeHtml(page.title)}">${escapeHtml(page.title || 'X ' + page.kind)}</p><button class="text-btn" id="saveBtn" data-state="idle">Save to Bookmarks</button></section>`;
+  if (page.kind === 'unreachable') return '<p class="muted-line">Reload this X tab to enable saving. <button class="text-btn" id="reloadBtn">Reload tab</button></p>';
+  return '';
 }
-
 function render(root, page) {
-  const pinState =
-    page.kind === 'article' && page.toc.length ? { visible: page.isPanelVisible } : null;
-  root.innerHTML = `
-    <div class="container">
-      ${renderHeader(pinState, page.kind === 'article' || page.kind === 'post')}
-      <main class="body">${bodyFor(page)}</main>
-      ${renderFooter()}
-    </div>`;
+ root.innerHTML = `<div class="container">${renderHeader()}<main class="body">${bodyFor(page)}<div id="home-summary">${homeSummary()}</div></main></div>`;
 }
-
 // Saved and error states are brief; the button then returns to idle. The
 // tooltip and accessible name carry the outcome, so the layout never shifts.
 const SAVE_RESET_MS = { saved: 1800, error: 4000 };
@@ -240,7 +155,7 @@ function setSaveState(button, state, label = SAVE_TITLES[state]) {
   button.disabled = state === 'saving';
   button.dataset.tip = label;
   button.setAttribute('aria-label', label);
-  button.innerHTML = icon(SAVE_ICONS[state]);
+  button.textContent = label;
   if (SAVE_RESET_MS[state]) {
     button.resetTimer = setTimeout(() => setSaveState(button, 'idle'), SAVE_RESET_MS[state]);
   }
@@ -265,29 +180,14 @@ function bindSave(button, tabId) {
 }
 
 function bindActions(root, page, tabId) {
-  root.querySelector('#libraryBtn').addEventListener('click', () => {
-    chrome.runtime.openOptionsPage();
-    window.close();
+  root.addEventListener('click', async event => {
+    const button = event.target.closest('[data-page]');
+    if (!button) return;
+    const result = await chrome.runtime.sendMessage({ action: 'app:open', payload: { page:button.dataset.page, route:button.dataset.route, accountId:snapshot?.accountId } });
+    if (result?.ok) window.close();
   });
-  root.querySelector('#reloadBtn')?.addEventListener('click', () => {
-    chrome.tabs.reload(tabId);
-    window.close();
-  });
-  root.querySelector('#showInlineTocBtn')?.addEventListener('click', async () => {
-    await chrome.tabs.sendMessage(tabId, { action: 'setTocPrefs', prefs: { autoShow: true } });
-    window.close();
-  });
-  root.querySelector('#pinBtn')?.addEventListener('click', async () => {
-    await chrome.tabs.sendMessage(tabId, { action: 'togglePanel' });
-    window.close();
-  });
-  root.querySelectorAll('.toc-link').forEach((link) => {
-    link.addEventListener('click', async (event) => {
-      event.preventDefault();
-      const index = Number(event.target.closest('.toc-item').dataset.index);
-      await chrome.tabs.sendMessage(tabId, { action: 'scrollTo', index });
-    });
-  });
+  root.querySelector('#reloadBtn')?.addEventListener('click', () => { chrome.tabs.reload(tabId); window.close(); });
+  root.addEventListener('change', event => { if (event.target.id === 'summary-account') loadSummary(root, event.target.value); });
   const save = root.querySelector('#saveBtn');
   if (save) bindSave(save, tabId);
   const sync = root.querySelector('#syncRoot');
@@ -325,6 +225,7 @@ async function describePage(tab) {
       toc: response?.toc || [],
       isPanelVisible: Boolean(response?.isPanelVisible),
       inlineTocOff: response?.inlineToc?.autoShow === false,
+      title: tab.title || '',
       bookmarkImport: response?.bookmarkImport
     };
   } catch {
@@ -338,4 +239,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   const page = await describePage(tab);
   render(root, page);
   bindActions(root, page, tab?.id);
+  loadSummary(root);
 });
+
+async function loadSummary(root, accountId) {
+  const target = root.querySelector('#home-summary');
+  try {
+    const result = await chrome.runtime.sendMessage({ action:'popup:summary', payload:{accountId} });
+    if (!result?.ok) throw Error(result?.error || 'Local summary unavailable.');
+    snapshot = result.data; target.innerHTML = homeSummary();
+  } catch { target.innerHTML = '<p class="muted-line">Local summary unavailable. Open Library or Analytics to continue.</p>'; }
+}

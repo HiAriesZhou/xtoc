@@ -71,7 +71,7 @@ export function createAnalyticsRepository({ storage, indexedDB = globalThis.inde
     await completion;
     return db;
   }
-  async function read({ accountId, since = 0 } = {}) {
+  async function read({ accountId, since = 0, kinds = FIELDS } = {}) {
     const db = await ready();
     const tx = db.transaction(['accounts', 'records']);
     const accounts = accountId
@@ -80,7 +80,7 @@ export function createAnalyticsRepository({ storage, indexedDB = globalThis.inde
     const state = emptyAnalytics();
     await Promise.all(accounts.map(async meta => {
       const account = { ...meta };
-      await Promise.all(FIELDS.map(async kind => {
+      await Promise.all(FIELDS.filter(kind => kinds.includes(kind)).map(async kind => {
         const rows = await request(tx.objectStore('records').index('accountTime').getAll(rangeFor(meta.id, kind, since)));
         account[kind] = Object.fromEntries(rows.map(row => [row.id, row.value]));
       }));

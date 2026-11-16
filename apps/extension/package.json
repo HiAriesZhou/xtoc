@@ -16,7 +16,7 @@
     "start": "extension start",
     "pretest": "npm run check:store-assets",
     "test": "node --test",
-    "build": "extension build",
+    "build": "extension build && node tooling/build-pages.mjs",
     "build:dev": "npm run build && node tooling/build-dev.mjs",
     "prebuild:zip": "npm run check:store-assets",
     "build:zip": "npm run build && node tooling/package-release.mjs"

@@ -6,7 +6,17 @@ import { createBookmarksView } from './bookmarks-view.js';
 import { createSettingsView } from './settings-view.js';
 import { createAnalyticsView } from './analytics-view.js';
 
-const ROUTES = ['clips', 'bookmarks', 'analytics', 'settings'];
+const moduleName = location.pathname.split('/')[1];
+const isLibrary = moduleName === 'library';
+const ROUTES = isLibrary ? ['bookmarks', 'clips'] : moduleName === 'analytics' ? ['analytics', 'data'] : ['settings'];
+const routes = isLibrary ? [['bookmarks','Bookmarks'],['clips','Clips']] : moduleName === 'analytics' ? [['analytics','Analytics'],['data','Data & Sync']] : [['settings','Settings']];
+document.title = `XTOC ${moduleName[0].toUpperCase() + moduleName.slice(1)}`;
+document.body.insertAdjacentHTML('afterbegin', `<header class="global-nav"><a class="brand" href="../library/index.html"><img id="brandIcon" alt="" width="24" height="24">XTOC</a><nav aria-label="XTOC"><a href="../library/index.html" ${isLibrary ? 'aria-current="page"' : ''}>Library</a><a href="../analytics/index.html" ${moduleName === 'analytics' ? 'aria-current="page"' : ''}>Analytics</a><a href="../settings/index.html" ${moduleName === 'settings' ? 'aria-current="page"' : ''}>Settings</a></nav></header><div class="app"><aside class="sidebar"><nav class="nav" aria-label="${moduleName}">${routes.map(([route,label]) => `<a href="#${route}" data-route="${route}">${label}${isLibrary ? `<span class="nav-count" id="count-${route}"></span>` : ''}</a>`).join('')}</nav></aside><main class="main" id="main"></main><aside class="drawer" id="drawer" aria-label="Details" hidden></aside></div><div class="toast" id="toast" role="status" aria-live="polite" hidden></div>`);
+
+chrome.runtime.onMessage.addListener((message, sender, respond) => {
+  if (sender.id !== chrome.runtime.id || message.action !== 'app:locate' || message.page !== moduleName) return false;
+  chrome.tabs.getCurrent().then(tab => respond({ id:tab.id, windowId:tab.windowId })); return true;
+});
 const TOAST_MS = 3200;
 
 const main = document.getElementById('main');
@@ -71,15 +81,17 @@ const views = {
   clips: createClipsView(ctx),
   bookmarks: createBookmarksView(ctx),
   analytics: createAnalyticsView(ctx),
-  settings: createSettingsView(ctx)
+  settings: createSettingsView(ctx),
+  data: createSettingsView(ctx, { analyticsOnly: true })
 };
 
 const currentRoute = () => {
   const route = location.hash.slice(1);
-  return ROUTES.includes(route) ? route : 'clips';
+  return ROUTES.includes(route) ? route : ROUTES[0];
 };
 
 function renderCounts() {
+  if (!isLibrary) return;
   const clipCount = clipGroups(ctx.state).reduce((sum, group) => sum + group.excerpts.length, 0);
   document.getElementById('count-clips').textContent = clipCount || '';
   document.getElementById('count-bookmarks').textContent =
@@ -93,12 +105,14 @@ function render() {
   document.querySelectorAll('[data-route]').forEach((link) => {
     const active = link.dataset.route === route;
     link.classList.toggle('active', active);
-    link.toggleAttribute('aria-current', active);
+    if (active) link.setAttribute('aria-current', 'page'); else link.removeAttribute('aria-current');
   });
   document.querySelector('.viz-tip')?.setAttribute('hidden', '');
+  if (isLibrary) chrome.storage.local.set({ xtocLibraryRoute: route });
   views[route].render(main);
 }
 
+document.querySelector('.global-nav').addEventListener('click', event => { if (event.target.closest('a') && !ctx.confirmDiscard()) event.preventDefault(); });
 let lastRoute = currentRoute();
 window.addEventListener('hashchange', () => {
   if (!ctx.confirmDiscard()) {
@@ -128,7 +142,7 @@ document.addEventListener('keydown', (event) => {
 // Only library keys matter here; settings such as AI preferences do not re-render.
 const LIBRARY_KEYS = Object.values(KEYS);
 chrome.storage.onChanged.addListener(async (changes, area) => {
-  if (area !== 'local' || ctx.dirty) return;
+  if (!isLibrary || area !== 'local' || ctx.dirty) return;
   if (!Object.keys(changes).some((key) => LIBRARY_KEYS.includes(key))) return;
   await ctx.reload();
   render();
@@ -149,7 +163,11 @@ const brandIcon = chrome.runtime.getManifest().icons?.['32'];
 if (brandIcon) document.getElementById('brandIcon').src = chrome.runtime.getURL(brandIcon);
 
 try {
-  [ctx.ai] = await Promise.all([rpc('ai:status'), ctx.reload()]);
+  ctx.ai = await rpc('ai:status');
+  if (isLibrary) {
+    if (!location.hash) { const saved = await chrome.storage.local.get('xtocLibraryRoute'); if (ROUTES.includes(saved.xtocLibraryRoute)) history.replaceState(null, '', `#${saved.xtocLibraryRoute}`); }
+    await ctx.reload();
+  }
 } catch (error) {
   ctx.toast(error.message, 'error');
 }

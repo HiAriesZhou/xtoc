@@ -71,3 +71,12 @@ test('large post history survives migration and a single-post refresh', { timeou
   assert.equal(await repo.ownerOf(String(size)), ACCOUNT_ID);
   await repo.close();
 });
+
+test('popup overview queries only recent daily records without loading posts', async () => {
+  const { repo } = fixture({ version: 1, accounts: { '1': { id: '1', daily: { '2020-01-01': { Impressions: 0 }, '2026-11-15': { Impressions: 8 } }, posts: { '7': { id: '7', createdAt: Date.parse('2026-11-15'), text: 'private post text' } } } } });
+  const result = (await repo.read({ accountId: '1', since: Date.parse('2026-11-01'), kinds: ['daily'] })).accounts['1'];
+  assert.deepEqual(Object.keys(result.daily), ['2026-11-15']);
+  assert.equal(result.posts, undefined);
+  assert.equal(result.counts.posts, 1);
+  await repo.close();
+});
