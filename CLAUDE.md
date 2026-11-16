@@ -17,9 +17,8 @@ node --test --test-name-pattern="clamp"    # tests matching a name
 npm run check:store-assets                 # store/ upload copies must match marketing/rendered/; store icons are store-only
 npm run dev                                # Extension.js dev mode with hot reload
 npm run build                              # dist/chromium
-npm run build:firefox / build:edge         # per-browser targets
 npm run build:dev                          # <repo>/dist/chromium-dev: local debug copy with DEV name/icons
-npm run build:zip                          # release/: Chrome, Edge, Firefox store ZIPs + Firefox source ZIP
+npm run build:zip                          # release/xtoc-chrome-v<version>.zip
 ```
 
 There is no lint script. Extension.js (`extension` devDependency) bundles each entry, so `src/` files may use ES `import` even in the content script. `extension.config.js` pins persistent browser profiles under `dist/extension-profile-*`.
@@ -50,6 +49,6 @@ Data model: articles keyed by `contentId(url)` from `src/library/model.js` (`art
 
 ## Manifest and metadata
 
-- `src/manifest.json` uses Extension.js browser-prefixed keys (`chromium:` → MV3 with `action`/service worker; `firefox:` → MV2 with `browser_action`/background scripts). Check the generated manifest in `dist/<browser>` after changes.
+- `src/manifest.json` is a plain Manifest V3 manifest with `action` and a background service worker. Chrome is the only maintained target. Check the generated manifest in `dist/chromium` after changes.
 - `test/release-metadata.test.js` enforces that `package.json`, `src/manifest.json`, and `package-lock.json`, and both READMEs' version badges agree.
 - `store/` holds the browser-store release definition (`store/release.yml`, listing text, release copies of assets); `marketing/` holds how they are made (`store-art.html` template, real UI captures in `ui/`, fixtures, social card); `assets/brand/` holds the logo and wordmark sources. `tooling/check-store-assets.js` fails `npm test` and `build:zip` when they diverge.

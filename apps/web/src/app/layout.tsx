@@ -39,6 +39,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
+    creator: "@AriesZhou",
     images: [{
       url: "/images/x-toc-social-1280x640.png",
       alt: "XTOC demo: navigate an article with a collapsible pinned table of contents and save selected passages locally.",
@@ -65,13 +66,16 @@ export default function RootLayout({
       <body className={`${uiFont.variable} ${displayFont.variable}`}>
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
           "@context": "https://schema.org", "@type": "SoftwareApplication",
-          "@id": `${siteUrl}/#software`, name: "XTOC", alternateName: "X-TOC",
+          "@id": `${siteUrl}/#software`, name: "XTOC",
           url: `${siteUrl}/`, applicationCategory: "BrowserApplication",
+          operatingSystem: "Any (desktop Chrome)",
           softwareRequirements: "Desktop Chrome; supported X/Twitter long-form articles",
           description: "A table of contents for X Articles with local clips, tags, notes, and Markdown or JSON export.",
+          image: `${siteUrl}/images/x-toc-social-1280x640.png`,
           downloadUrl: "https://chromewebstore.google.com/detail/nbdgpckkcfkomnmdefinikjijgljgjfp",
-          sameAs: ["https://github.com/HiAriesZhou/x-toc"],
-        }) }} />
+          sameAs: ["https://github.com/HiAriesZhou/xtoc"],
+          author: { "@type": "Person", name: "AriesZhou", url: "https://x.com/AriesZhou" },
+        }).replace(/</g, "\\u003c") }} />
         {children}
       </body>
     </html>

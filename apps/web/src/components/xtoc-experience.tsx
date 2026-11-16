@@ -13,7 +13,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DocsMain, DocsRail } from "@/components/docs-view";
 
 const chromeStoreUrl = "https://chromewebstore.google.com/detail/nbdgpckkcfkomnmdefinikjijgljgjfp?utm_source=item-share-cb";
-const extensionRepoUrl = "https://github.com/HiAriesZhou/x-toc";
+const extensionRepoUrl = "https://github.com/HiAriesZhou/xtoc";
 
 export type View = "home" | "article" | "clips" | "docs";
 
@@ -576,7 +576,7 @@ export function XtocExperience({ initialView }: { initialView: View }) {
           <button className="reset-demo" onClick={() => { setClips(sampleClips); setSelectedClipIds([]); setExpandedClipIds([]); setQuery(""); setEditorClipId(null); setToast("Demo reset"); }}><RotateCcw aria-hidden="true" /> Reset demo collection</button>
           <p className="demo-boundary">Demo only. Refreshing resets this collection. Exports contain sample content and are separate from the extension’s export contract.</p>
         </section>}
-      <footer className="site-policy-footer"><Link href="/privacy">Privacy Policy</Link><span>Local clips · No telemetry · No uploads</span></footer>
+      <footer className="site-policy-footer"><Link href="/privacy">Privacy Policy</Link><span>Local clips · No telemetry · No uploads</span><a href="https://x.com/AriesZhou" target="_blank" rel="noopener noreferrer">By AriesZhou</a></footer>
       </main>
 
       <aside className={`context-rail view-rail${view === "home" ? " home-context" : ""}${view === "article" && tocVisible ? " toc-open" : ""}${view === "clips" ? " clips-context" : ""}${view === "docs" ? " docs-rail" : ""}`} key={`${view}-rail`}>

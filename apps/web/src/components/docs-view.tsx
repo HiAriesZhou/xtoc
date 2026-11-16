@@ -1,8 +1,8 @@
 import { Download, FileDown, Github, Highlighter, Library, LockKeyhole, Search, BookOpenText } from "lucide-react";
 
 const chromeStoreUrl = "https://chromewebstore.google.com/detail/nbdgpckkcfkomnmdefinikjijgljgjfp?utm_source=item-share-cb";
-const extensionRepoUrl = "https://github.com/HiAriesZhou/x-toc";
-const websiteRepoUrl = "https://github.com/HiAriesZhou/x-toc-landing-page";
+const extensionRepoUrl = "https://github.com/HiAriesZhou/xtoc";
+const websiteRepoUrl = "https://github.com/HiAriesZhou/xtoc/tree/main/apps/web";
 
 const steps = [
   { icon: BookOpenText, title: "1. Open a supported article", body: "Visit a long-form article on X.com or Twitter.com. XTOC detects headings when the article provides them." },
@@ -80,7 +80,7 @@ export function DocsMain() {
       <div className="docs-shell">
         <p className="eyebrow">Project links</p>
         <h2>Source and maintenance</h2>
-        <div className="docs-links"><a href="/privacy">Privacy Policy</a><a href={extensionRepoUrl} target="_blank" rel="noopener noreferrer">Extension source</a><a href={websiteRepoUrl} target="_blank" rel="noopener noreferrer">Website source</a><a href={chromeStoreUrl} target="_blank" rel="noopener noreferrer">Chrome Web Store</a></div>
+        <div className="docs-links"><a href="/privacy">Privacy Policy</a><a href="https://x.com/AriesZhou" target="_blank" rel="noopener noreferrer">By AriesZhou</a><a href={extensionRepoUrl} target="_blank" rel="noopener noreferrer">Extension source</a><a href={websiteRepoUrl} target="_blank" rel="noopener noreferrer">Website source</a><a href={chromeStoreUrl} target="_blank" rel="noopener noreferrer">Chrome Web Store</a></div>
       </div>
     </section>
   </div>;

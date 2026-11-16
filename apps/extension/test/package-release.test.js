@@ -2,17 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { TARGETS, manifestProblems, releaseFileName } from '../tooling/package-release.mjs';
 
-test('one package per store plus the Firefox source archive', () => {
+test('packages only the Chrome Manifest V3 build', () => {
   assert.deepEqual(
     TARGETS.map((t) => [t.id, t.dir, t.manifestVersion]),
-    [
-      ['chrome', 'dist/chromium', 3],
-      ['edge', 'dist/edge', 3],
-      ['firefox', 'dist/firefox', 2]
-    ]
+    [['chrome', 'dist/chromium', 3]]
   );
-  assert.equal(releaseFileName('firefox', '0.7.0'), 'xtoc-firefox-v0.7.0.zip');
-  assert.equal(releaseFileName('source', '0.7.0'), 'xtoc-source-v0.7.0.zip');
+  assert.equal(releaseFileName('chrome', '0.9.1'), 'xtoc-chrome-v0.9.1.zip');
 });
 
 test('manifest checks catch wrong versions, wrong manifest versions and dev branding', () => {

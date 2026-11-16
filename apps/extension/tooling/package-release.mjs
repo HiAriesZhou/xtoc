@@ -1,8 +1,6 @@
-// Packages the Chrome, Edge and Firefox builds for store upload, plus the
-// source archive Mozilla reviewers need to reproduce the Firefox build.
-// Run through `npm run build:zip`, which builds all three targets first.
-//
-// Output: release/xtoc-{chrome,edge,firefox,source}-v<version>.zip
+// Packages the Chrome build for store upload.
+// Run through `npm run build:zip`.
+// Output: release/xtoc-chrome-v<version>.zip
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { mkdir, readFile, rm } from 'node:fs/promises';
@@ -12,9 +10,7 @@ const root = path.resolve(import.meta.dirname, '..');
 const RELEASE_DIR = path.join(root, 'release');
 
 export const TARGETS = [
-  { id: 'chrome', dir: 'dist/chromium', manifestVersion: 3 },
-  { id: 'edge', dir: 'dist/edge', manifestVersion: 3 },
-  { id: 'firefox', dir: 'dist/firefox', manifestVersion: 2 }
+  { id: 'chrome', dir: 'dist/chromium', manifestVersion: 3 }
 ];
 
 // Files that exist only in local development builds and must never ship.
@@ -69,15 +65,6 @@ function zipDirectory(sourceDir, outFile) {
     throw new Error(`${path.basename(outFile)} has no manifest.json at its root`);
 }
 
-function sourceArchive(outFile) {
-  const dirty = run('git', ['status', '--porcelain', '--', '.'], { cwd: root }).trim();
-  if (dirty) {
-    return 'skipped: uncommitted changes would not match the built Firefox package. Commit, then run again.';
-  }
-  run('git', ['archive', '--format=zip', `--output=${outFile}`, 'HEAD'], { cwd: root });
-  return `from commit ${run('git', ['rev-parse', '--short', 'HEAD'], { cwd: root }).trim()}`;
-}
-
 async function main() {
   const { version } = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
   const problems = [];
@@ -103,10 +90,6 @@ async function main() {
     zipDirectory(path.join(root, target.dir), outFile);
     lines.push(`${path.relative(root, outFile)}`);
   }
-  const sourceFile = path.join(RELEASE_DIR, releaseFileName('source', version));
-  await rm(sourceFile, { force: true });
-  const sourceNote = sourceArchive(sourceFile);
-  lines.push(`${path.relative(root, sourceFile)} (${sourceNote})`);
   console.log(`XTOC ${version} packages:\n  ${lines.join('\n  ')}`);
 }
 

@@ -334,9 +334,7 @@ chrome.runtime.onInstalled.addListener((details) => {
 });
 
 // Open X tabs keep working after an install or update without a reload.
-// Firefox (Manifest V2, no chrome.scripting) re-injects content scripts itself.
 async function reinjectContentScripts() {
-  if (!chrome.scripting) return;
   const tabs = await chrome.tabs.query({ url: ['https://x.com/*', 'https://twitter.com/*'] });
   for (const { tabId, js, css, world } of reinjectionTargets(chrome.runtime.getManifest(), tabs)) {
     try {
@@ -349,8 +347,7 @@ async function reinjectContentScripts() {
 }
 
 chrome.contextMenus.onClicked.addListener(() => {
-  const action = chrome.action || chrome.browserAction;
-  action?.openPopup?.()?.catch(() => {});
+  chrome.action.openPopup?.()?.catch(() => {});
 });
 
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
