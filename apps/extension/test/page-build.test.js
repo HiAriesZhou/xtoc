@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 const root = path.resolve(import.meta.dirname, '..');
 test('independent page ES modules are valid Chrome JavaScript', () => {
-  for (const dir of ['options','popup','settings','analytics','library']) {
+  for (const dir of ['ui','options','popup','settings','analytics','library']) {
     for (const file of readdirSync(path.join(root,'src',dir))) if (file.endsWith('.js')) execFileSync(process.execPath,['--check',path.join(root,'src',dir,file)]);
   }
 });

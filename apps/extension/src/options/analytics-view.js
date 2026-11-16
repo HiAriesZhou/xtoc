@@ -91,8 +91,8 @@ export function createAnalyticsView(ctx) {
         <header class="page-head">
           <div class="page-title"><h1>Analytics</h1>${picker}</div>
           <div class="inline-actions">
-            ${accounts.length ? `<div class="seg" role="group" aria-label="Period">${PERIODS.map((d) => `<button type="button" class="seg-btn" data-days="${d}" aria-pressed="${view.days === d}">${d}D</button>`).join('')}</div>` : ''}
-            ${accounts.length ? `<button type="button" class="btn btn-secondary" data-action="digest">${icon('download', 15)}Digest</button>` : ''}
+            ${accounts.length ? `<div class="segment" role="group" aria-label="Period">${PERIODS.map((d) => `<button type="button" class="seg-btn" data-days="${d}" aria-pressed="${view.days === d}">${d}D</button>`).join('')}</div>` : ''}
+            ${accounts.length ? `<button type="button" class="btn btn-secondary" data-action="digest">${icon('download')}Digest</button>` : ''}
             <button type="button" class="btn btn-secondary" data-action="pause-sync">Pause sync</button>
             <button type="button" class="btn btn-primary" data-action="sync"${running ? ' disabled' : ''}>${running ? 'Syncing…' : 'Sync from X'}</button>
           </div>

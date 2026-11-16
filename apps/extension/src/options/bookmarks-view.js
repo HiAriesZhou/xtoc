@@ -172,7 +172,7 @@ export function createBookmarksView(ctx) {
     const running = Boolean(view.requestId);
     return `
       <div class="inline-actions start">
-        <button class="btn btn-secondary btn-sm" type="button" data-action="ai-suggest" ${running ? 'disabled' : ''}>${icon('sparkles', 14)}${running ? 'Suggesting…' : 'Suggest tags & summary'}</button>
+        <button class="btn btn-secondary btn-sm" type="button" data-action="ai-suggest" ${running ? 'disabled' : ''}>${icon('sparkles')}${running ? 'Suggesting…' : 'Suggest tags & summary'}</button>
         ${running ? '<button class="btn btn-ghost btn-sm" type="button" data-action="ai-cancel">Cancel</button>' : ''}
       </div>`;
   }
@@ -188,7 +188,7 @@ export function createBookmarksView(ctx) {
         <div>
           <h2 class="drawer-title">${
             bookmark.url
-              ? `<a href="${esc(bookmark.url)}" target="_blank" rel="noopener noreferrer" title="Open on X">${esc(bookmark.title)}${icon('external', 14)}</a>`
+              ? `<a href="${esc(bookmark.url)}" target="_blank" rel="noopener noreferrer" title="Open on X">${esc(bookmark.title)}${icon('external')}</a>`
               : esc(bookmark.title)
           }</h2>
           <p class="subtle">${esc(meta.join(' · '))}</p>
@@ -204,7 +204,7 @@ export function createBookmarksView(ctx) {
         }
       </form>
       <footer class="drawer-foot">
-        <button class="btn btn-ghost-danger" type="button" data-action="delete-one">${icon('trash', 14)}Delete</button>
+        <button class="btn btn-ghost-danger" type="button" data-action="delete-one">${icon('trash')}Delete</button>
         <button class="btn btn-primary" type="submit" form="editForm">Save</button>
       </footer>`;
   }

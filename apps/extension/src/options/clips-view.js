@@ -163,7 +163,7 @@ export function createClipsView(ctx) {
         <label class="field"><span>Note</span><textarea class="input" name="note" rows="6">${esc(clip.note || '')}</textarea></label>
       </form>
       <footer class="drawer-foot">
-        <button class="btn btn-ghost-danger" type="button" data-action="delete-one">${icon('trash', 14)}Delete</button>
+        <button class="btn btn-ghost-danger" type="button" data-action="delete-one">${icon('trash')}Delete</button>
         <button class="btn btn-primary" type="submit" form="editForm">Save</button>
       </footer>`);
     drawer.querySelector('#editForm').onsubmit = ctx.guard(async (event) => {

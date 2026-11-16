@@ -5,7 +5,7 @@ import { cp, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 const root = path.resolve(import.meta.dirname, '..');
 const out = path.join(root, 'dist/chromium');
-for (const dir of ['options', 'library', 'analytics', 'settings', 'popup']) {
+for (const dir of ['ui', 'options', 'library', 'analytics', 'settings', 'popup']) {
   await cp(path.join(root, 'src', dir), path.join(out, dir), { recursive: true });
 }
 await cp(path.join(root, 'src/analytics-db.js'), path.join(out, 'analytics-db.js'));

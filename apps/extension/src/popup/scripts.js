@@ -1,34 +1,10 @@
 // Popup entry point. Holds no state: it asks the content script what the
 // current X page is, then renders one of a few states.
+import { icon } from '../ui/icons.js';
 import { syncView } from './bookmark-sync.js';
 
-const REPOSITORY_URL = 'https://github.com/HiAriesZhou/xtoc';
 const X_PAGE = /^https:\/\/(x\.com|twitter\.com)\//;
 
-const ICONS = {
-  pin: '<path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/>',
-  unpin:
-    '<path d="M12 17v5"/><path d="M15 9.34V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H7.89"/><path d="m2 2 20 20"/><path d="M9 9v1.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h11"/>',
-  save: '<path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/><line x1="12" x2="12" y1="7" y2="13"/><line x1="15" x2="9" y1="10" y2="10"/>',
-  saved: '<path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/><path d="m9 10 2 2 4-4"/>',
-  error:
-    '<circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/>',
-  article:
-    '<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>',
-  timeline:
-    '<rect width="18" height="7" x="3" y="3" rx="1"/><rect width="18" height="7" x="3" y="14" rx="1"/>',
-  refresh:
-    '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
-  library: '<path d="m16 6 4 14"/><path d="M12 6v14"/><path d="M8 8v12"/><path d="M4 4v16"/>',
-  import:
-    '<path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/><path d="M12 7v6"/><path d="m9 10 3 3 3-3"/>',
-  pause: '<rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/>',
-  play: '<path d="M7 4v16l13-8z"/>',
-  stop: '<rect x="6" y="6" width="12" height="12" rx="2"/>',
-  check: '<path d="M20 6 9 17l-5-5"/>',
-  github:
-    '<path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3.28-.36 6.72-1.61 6.72-7A5.4 5.4 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.4 5.4 0 0 0-1.42 2.73c0 5.42 3.44 6.66 6.72 7A4.8 4.8 0 0 0 9 18v4"/><path d="M9 18c-4.51 2-5-2-7-2"/>'
-};
 
 const SAVE_TITLES = {
   idle: 'Save to Bookmarks',
@@ -36,7 +12,6 @@ const SAVE_TITLES = {
   saved: 'Saved to Bookmarks',
   error: 'Save failed · try again'
 };
-const SAVE_ICONS = { idle: 'save', saving: 'save', saved: 'saved', error: 'error' };
 
 const escapeHtml = (value) =>
   String(value).replace(
@@ -44,30 +19,14 @@ const escapeHtml = (value) =>
     (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]
   );
 
-const icon = (name, size = 16) =>
-  `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name]}</svg>`;
-
 // Uses the running build's own icon, so a local debug build shows its DEV logo.
 function brandIconUrl() {
   const path = chrome.runtime.getManifest().icons?.['32'];
   return path ? chrome.runtime.getURL(path) : '';
 }
 
-// Icon buttons show their name in a tooltip (data-tip) and to screen readers.
-const iconButton = ({ id, name, label, extraClass = '', attrs = '' }) => `
-  <button class="icon-btn ${extraClass}" id="${id}" type="button" data-tip="${label}" aria-label="${label}" ${attrs}>${icon(name)}</button>`;
-
-const saveButton = () =>
-  iconButton({
-    id: 'saveBtn',
-    name: SAVE_ICONS.idle,
-    label: SAVE_TITLES.idle,
-    extraClass: 'save-btn',
-    attrs: 'data-state="idle"'
-  });
-
 function renderHeader() {
-  return `<header class="header"><div class="brand"><img src="${brandIconUrl()}" alt="" width="20" height="20">XTOC</div><button class="text-btn" data-page="settings">Settings</button></header><nav class="popup-nav" aria-label="XTOC"><button data-page="library">Library</button><button data-page="analytics">Analytics</button></nav>`;
+  return `<header class="header"><div class="brand"><img src="${brandIconUrl()}" alt="" width="20" height="20">XTOC</div><button class="btn btn-secondary btn-sm" data-page="settings">Settings</button></header><nav class="popup-nav" aria-label="XTOC"><button class="btn btn-secondary" data-page="library">Library</button><button class="btn btn-secondary" data-page="analytics">Analytics</button></nav>`;
 }
 let snapshot = null;
 function safeLink(value) { try { const url = new URL(value); return ['https:', 'http:'].includes(url.protocol) ? escapeHtml(url.href) : ''; } catch { return ''; } }
@@ -77,7 +36,7 @@ function homeSummary() {
   const account = d.accounts.find(a => a.id === d.accountId);
   const num = value => value === null ? '–' : new Intl.NumberFormat('en', { notation:'compact', maximumFractionDigits:1 }).format(value);
   const metrics = stats ? `<p class="summary-period">Last 7 complete days · UTC · ${stats.coverage}/7 days captured${stats.coverage < 7 ? ' · totals for captured days' : ''}</p><div class="summary-kpis">${stats.kpis.map(k => `<div><span>${escapeHtml(k.label)}</span><strong>${k.format === 'percent' && k.value !== null ? (k.value * 100).toFixed(2) + '%' : num(k.value)}</strong></div>`).join('')}</div>` : '<p class="muted-line">Connect your own X Premium analytics to see account performance.</p>';
-  return `<section class="home-section"><button class="section-link" data-page="library">My library <span>${d.bookmarks} bookmarks · ${d.clips} clips</span></button>${d.recent.length ? d.recent.map(item => `<a class="recent-item" href="${safeLink(item.url)}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(item.title)}"><small>${item.kind}</small><span>${escapeHtml(item.title || 'Untitled')}</span></a>`).join('') : '<p class="muted-line">Save an X post or select a passage to start your library.</p>'}</section><section class="home-section"><button class="section-link" data-page="analytics">Analytics <span>${account ? '@' + escapeHtml(account.handle || account.id) : 'Open analytics'}</span></button>${d.accounts.length > 1 ? `<select aria-label="Analytics account" id="summary-account">${d.accounts.map(a => `<option value="${a.id}" ${a.id === d.accountId ? 'selected' : ''}>@${escapeHtml(a.handle || a.id)}</option>`).join('')}</select>` : ''}${metrics}<p class="summary-period">${d.sync.running ? 'Syncing in an inactive tab' : d.sync.paused ? 'Sync paused' : d.sync.queued ? 'History queued: ' + d.sync.queued + ' windows' : d.sync.mode === 'background' ? 'Updates every 6 hours' : 'Manual / on-visit updates'}${d.sync.capturedAt ? ' · Last capture ' + new Date(d.sync.capturedAt).toLocaleString() : ''}</p>${d.sync.error ? `<p class="summary-error">${escapeHtml(d.sync.error)}</p>` : ''}<button class="text-btn" data-page="analytics" data-route="data">Data & Sync</button></section>`;
+  return `<section class="home-section"><button class="section-link" data-page="library">My library <span>${d.bookmarks} bookmarks · ${d.clips} clips</span></button>${d.recent.length ? d.recent.map(item => `<a class="recent-item" href="${safeLink(item.url)}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(item.title)}"><small>${item.kind}</small><span>${escapeHtml(item.title || 'Untitled')}</span></a>`).join('') : '<p class="muted-line">Save an X post or select a passage to start your library.</p>'}</section><section class="home-section"><button class="section-link" data-page="analytics">Analytics <span>${account ? '@' + escapeHtml(account.handle || account.id) : 'Open analytics'}</span></button>${d.accounts.length > 1 ? `<select class="input" aria-label="Analytics account" id="summary-account">${d.accounts.map(a => `<option value="${a.id}" ${a.id === d.accountId ? 'selected' : ''}>@${escapeHtml(a.handle || a.id)}</option>`).join('')}</select>` : ''}${metrics}<p class="summary-period">${d.sync.running ? 'Syncing in an inactive tab' : d.sync.paused ? 'Sync paused' : d.sync.queued ? 'History queued: ' + d.sync.queued + ' windows' : d.sync.mode === 'background' ? 'Updates every 6 hours' : 'Manual / on-visit updates'}${d.sync.capturedAt ? ' · Last capture ' + new Date(d.sync.capturedAt).toLocaleString() : ''}</p>${d.sync.error ? `<p class="summary-error">${escapeHtml(d.sync.error)}</p>` : ''}<button class="btn btn-secondary btn-sm" data-page="analytics" data-route="data">Data & Sync</button></section>`;
 }
 
 // Bookmarks pages: import controls instead of the "no article" notice.
@@ -92,7 +51,7 @@ function syncLead(status, view) {
 
 function renderSyncButton({ command, label, icon: name, variant }) {
   const content = name ? `${icon(name)}<span>${label}</span>` : label;
-  return `<button class="sync-btn ${variant}" type="button" data-command="${command}">${content}</button>`;
+  return `<button class="sync-btn btn ${variant === 'link' ? 'btn-link' : variant === 'primary' ? 'btn-primary' : 'btn-secondary'} ${variant}" type="button" data-command="${command}">${content}</button>`;
 }
 
 // A fixed skeleton that updateSync fills in. Progress polls change only the
@@ -138,8 +97,8 @@ function updateSync(root, status) {
 
 function bodyFor(page) {
   if (page.bookmarkImport?.available) return `<div id="syncRoot">${SYNC_SKELETON}</div>`;
-  if (page.kind === 'article' || page.kind === 'post') return `<section class="current-page"><p class="section-label">Current ${page.kind}</p><p class="current-title" title="${escapeHtml(page.title)}">${escapeHtml(page.title || 'X ' + page.kind)}</p><button class="text-btn" id="saveBtn" data-state="idle">Save to Bookmarks</button></section>`;
-  if (page.kind === 'unreachable') return '<p class="muted-line">Reload this X tab to enable saving. <button class="text-btn" id="reloadBtn">Reload tab</button></p>';
+  if (page.kind === 'article' || page.kind === 'post') return `<section class="current-page"><p class="section-label">Current ${page.kind}</p><p class="current-title" title="${escapeHtml(page.title)}">${escapeHtml(page.title || 'X ' + page.kind)}</p><button class="btn btn-secondary btn-sm" id="saveBtn" data-state="idle">Save to Bookmarks</button></section>`;
+  if (page.kind === 'unreachable') return '<p class="muted-line">Reload this X tab to enable saving. <button class="btn btn-secondary btn-sm" id="reloadBtn">Reload tab</button></p>';
   return '';
 }
 function render(root, page) {
