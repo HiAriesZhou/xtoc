@@ -11,7 +11,7 @@ const SOURCE_DIR = path.join(root, 'dist', 'chromium');
 
 // Keep one stable path: Chrome derives an unpacked extension's ID, and therefore
 // its local storage, from the folder it was loaded from. Outside the monorepo
-// layout (e.g. the Mozilla source archive) stay inside the package.
+// layout, stay inside the package.
 export function devBuildDir(packageDir) {
   const repoRoot = path.resolve(packageDir, '..', '..');
   const inMonorepo = path.relative(repoRoot, packageDir) === path.join('apps', 'extension');

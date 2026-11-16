@@ -45,22 +45,3 @@ privacy:
     relatedToSinglePurpose: true
     noCreditworthinessUse: true
   policyUrl: https://xtoc.arieszhou.com/privacy
-stores:
-  firefox:
-    summary: >-
-      Navigate long X articles with a table of contents, and save posts,
-      articles and passages to a local library you can export.
-    categories: [other]
-    reviewerNotes: listing/firefox/reviewer-notes.txt
-  edge:
-    category: Productivity
-    searchTerms:
-      - X
-      - Twitter
-      - articles
-      - table of contents
-      - bookmarks
-      - Markdown
-      - clippings
-    assets:
-      logo: assets/icon/icon-edge-300.png

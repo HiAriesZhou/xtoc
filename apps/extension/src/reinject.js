@@ -1,6 +1,6 @@
 // Chrome does not inject content scripts into tabs that were already open when
 // the extension is installed or updated. The background re-injects them so X
-// tabs keep working without a reload. Firefox does this itself.
+// tabs keep working without a reload.
 
 // Supports the scheme://host/* patterns this extension declares.
 export function matchesPattern(url, pattern) {
