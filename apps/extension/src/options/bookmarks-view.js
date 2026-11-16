@@ -1,3 +1,4 @@
+import { libraryTabs } from './ui.js';
 import { bookmarkList } from '../library/model.js';
 import { bookmarkFiles, zipFiles } from '../library/obsidian.js';
 import { normalizeClipTags, splitClipTagInput } from '../library/tags.js';
@@ -172,7 +173,7 @@ export function createBookmarksView(ctx) {
     const running = Boolean(view.requestId);
     return `
       <div class="inline-actions start">
-        <button class="btn btn-secondary btn-sm" type="button" data-action="ai-suggest" ${running ? 'disabled' : ''}>${icon('sparkles', 14)}${running ? 'Suggesting…' : 'Suggest tags & summary'}</button>
+        <button class="btn btn-secondary btn-sm" type="button" data-action="ai-suggest" ${running ? 'disabled' : ''}>${icon('sparkles')}${running ? 'Suggesting…' : 'Suggest tags & summary'}</button>
         ${running ? '<button class="btn btn-ghost btn-sm" type="button" data-action="ai-cancel">Cancel</button>' : ''}
       </div>`;
   }
@@ -188,7 +189,7 @@ export function createBookmarksView(ctx) {
         <div>
           <h2 class="drawer-title">${
             bookmark.url
-              ? `<a href="${esc(bookmark.url)}" target="_blank" rel="noopener noreferrer" title="Open on X">${esc(bookmark.title)}${icon('external', 14)}</a>`
+              ? `<a href="${esc(bookmark.url)}" target="_blank" rel="noopener noreferrer" title="Open on X">${esc(bookmark.title)}${icon('external')}</a>`
               : esc(bookmark.title)
           }</h2>
           <p class="subtle">${esc(meta.join(' · '))}</p>
@@ -204,7 +205,7 @@ export function createBookmarksView(ctx) {
         }
       </form>
       <footer class="drawer-foot">
-        <button class="btn btn-ghost-danger" type="button" data-action="delete-one">${icon('trash', 14)}Delete</button>
+        <button class="btn btn-ghost-danger" type="button" data-action="delete-one">${icon('trash')}Delete</button>
         <button class="btn btn-primary" type="submit" form="editForm">Save</button>
       </footer>`;
   }
@@ -339,12 +340,13 @@ export function createBookmarksView(ctx) {
       main.innerHTML = `
         <div class="page-top">
         <header class="page-head">
-          <div class="page-title"><h1>Bookmarks</h1><span class="subtle" id="subtitle"></span></div>
+          <div class="page-title"><h1>Library</h1><span class="subtle" id="subtitle"></span></div>
           <div class="inline-actions">
             <button class="btn btn-secondary" type="button" data-action="import">${icon('import')}Import from X</button>
             <button class="btn btn-primary" type="button" data-action="export">${icon('download')}<span id="exportLabel">Export</span></button>
           </div>
         </header>
+        ${libraryTabs('bookmarks')}
         <div class="toolbar">
           <input class="check" type="checkbox" id="selectAll" aria-label="Select all visible bookmarks">
           <div class="toolbar-filters"><div id="search"></div><div id="tagFilter"></div></div>

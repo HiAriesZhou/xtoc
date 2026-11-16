@@ -1,0 +1,99 @@
+/* Shared extension UI tokens. Page CSS consumes roles, never its own palette.
+   X-page components remain isolated and inherit the host's theme. */
+:root {
+  color-scheme: light;
+  --xtoc-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --xtoc-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --xtoc-space-1: 4px;
+  --xtoc-space-2: 8px;
+  --xtoc-space-3: 12px;
+  --xtoc-space-4: 16px;
+  --xtoc-space-5: 20px;
+  --xtoc-space-6: 24px;
+  --xtoc-space-8: 32px;
+  --xtoc-space-10: 40px;
+  --xtoc-space-12: 48px;
+  --xtoc-text-xs: 12px;
+  --xtoc-text-sm: 13px;
+  --xtoc-text-base: 14px;
+  --xtoc-text-lg: 16px;
+  --xtoc-text-title: 20px;
+  --xtoc-text-metric: 28px;
+  --xtoc-control-sm: 32px;
+  --xtoc-control-md: 36px;
+  --xtoc-icon-sm: 16px;
+  --xtoc-icon-md: 20px;
+  --xtoc-radius-control: 8px;
+  --xtoc-radius-surface: 12px;
+  --xtoc-radius-small: 4px;
+  --xtoc-radius-pill: 999px;
+  --xtoc-canvas: #f7f9f9;
+  --xtoc-surface: #ffffff;
+  --xtoc-surface-muted: #eff3f4;
+  --xtoc-text: #0f1419;
+  --xtoc-text-muted: #536471;
+  --xtoc-border: #d8e0e5;
+  --xtoc-accent: #096db0;
+  --xtoc-accent-tint: #e8f5fe;
+  --xtoc-action: #0876bd;
+  --xtoc-action-hover: #065f9a;
+  --xtoc-on-action: #ffffff;
+  --xtoc-danger: #b9233a;
+  --xtoc-danger-tint: #fdecee;
+  --xtoc-danger-action: #b9233a;
+  --xtoc-success: #08784f;
+  --xtoc-success-tint: #e6f6f0;
+  --xtoc-logo-tile: #f7f9f9;
+  --xtoc-shadow: 0 12px 32px rgb(15 20 25 / 0.12);
+
+  --xtoc-viz-1: #2a78d6;
+  --xtoc-viz-2: #eb6834;
+  --xtoc-viz-area: rgb(42 120 214 / 0.1);
+  --xtoc-viz-grid: #eef1f3;
+  --xtoc-seq-1: #cde2fb;
+  --xtoc-seq-2: #9ec5f4;
+  --xtoc-seq-3: #6da7ec;
+  --xtoc-seq-4: #3987e5;
+  --xtoc-seq-5: #1c5cab;
+  --xtoc-ord-1: #86b6ef;
+  --xtoc-ord-2: #3987e5;
+  --xtoc-ord-3: #1c5cab;
+  --xtoc-up: #00875a;
+  --xtoc-down: #c4314b;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --xtoc-canvas: #000000;
+    --xtoc-surface: #080808;
+    --xtoc-surface-muted: #16181c;
+    --xtoc-text: #e7e9ea;
+    --xtoc-text-muted: #a1a9b0;
+    --xtoc-border: #2f3336;
+    --xtoc-accent: #71bdf0;
+    --xtoc-accent-tint: #102a3c;
+    --xtoc-action: #0876bd;
+    --xtoc-action-hover: #096db0;
+    --xtoc-danger: #ff8694;
+    --xtoc-danger-tint: #3b2229;
+    --xtoc-success: #56cba2;
+    --xtoc-success-tint: #173a33;
+    --xtoc-shadow: 0 12px 32px rgb(0 0 0 / 0.4);
+
+    --xtoc-viz-1: #3987e5;
+    --xtoc-viz-2: #d95926;
+    --xtoc-viz-area: rgb(57 135 229 / 0.12);
+    --xtoc-viz-grid: #24282b;
+    --xtoc-seq-1: #1a3d63;
+    --xtoc-seq-2: #1c5cab;
+    --xtoc-seq-3: #3987e5;
+    --xtoc-seq-4: #6da7ec;
+    --xtoc-seq-5: #b7d3f6;
+    --xtoc-ord-1: #256abf;
+    --xtoc-ord-2: #5598e7;
+    --xtoc-ord-3: #9ec5f4;
+    --xtoc-up: #2fc48d;
+    --xtoc-down: #ff6c7b;
+  }
+}

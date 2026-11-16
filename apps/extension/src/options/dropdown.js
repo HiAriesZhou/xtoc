@@ -55,7 +55,7 @@ export function createDropdown(container, config) {
       ${config.ariaLabel ? `aria-label="${esc(config.ariaLabel)}"` : ''}>
       ${config.iconName ? icon(config.iconName) : ''}
       <span class="dropdown-label"></span>
-      <span class="dropdown-chevron">${icon('chevron', 14)}</span>
+      <span class="dropdown-chevron">${icon('chevron')}</span>
     </button>
     <div class="dropdown-panel" id="${id}" role="${mode === 'select' ? 'listbox' : 'menu'}" tabindex="-1"
       data-align="${config.align || 'start'}" hidden></div>`;
@@ -84,7 +84,7 @@ export function createDropdown(container, config) {
         return `
           <div class="dropdown-option ${index === state.active ? 'is-active' : ''}" id="${id}-${index}"
             role="${role}" data-index="${index}" ${mode === 'select' ? `aria-selected="${selected}"` : ''}>
-            ${mode === 'select' ? `<span class="dropdown-check">${icon('check', 14)}</span>` : ''}
+            ${mode === 'select' ? `<span class="dropdown-check">${icon('check')}</span>` : ''}
             <span>${esc(option.label)}</span>
           </div>`;
       })

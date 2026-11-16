@@ -1,3 +1,4 @@
+import { libraryTabs } from './ui.js';
 import { clipGroups } from '../library/model.js';
 import { clipFiles, zipFiles } from '../library/obsidian.js';
 import { splitClipTagInput } from '../library/tags.js';
@@ -163,7 +164,7 @@ export function createClipsView(ctx) {
         <label class="field"><span>Note</span><textarea class="input" name="note" rows="6">${esc(clip.note || '')}</textarea></label>
       </form>
       <footer class="drawer-foot">
-        <button class="btn btn-ghost-danger" type="button" data-action="delete-one">${icon('trash', 14)}Delete</button>
+        <button class="btn btn-ghost-danger" type="button" data-action="delete-one">${icon('trash')}Delete</button>
         <button class="btn btn-primary" type="submit" form="editForm">Save</button>
       </footer>`);
     drawer.querySelector('#editForm').onsubmit = ctx.guard(async (event) => {
@@ -247,9 +248,10 @@ export function createClipsView(ctx) {
       main.innerHTML = `
         <div class="page-top">
         <header class="page-head">
-          <div class="page-title"><h1>Clips</h1><span class="subtle" id="subtitle"></span></div>
+          <div class="page-title"><h1>Library</h1><span class="subtle" id="subtitle"></span></div>
           <div id="exportMenu"></div>
         </header>
+        ${libraryTabs('clips')}
         <div class="toolbar">
           <input class="check" type="checkbox" id="selectAll" aria-label="Select all visible clips">
           <div class="toolbar-filters"><div id="search"></div><div id="tagFilter"></div></div>

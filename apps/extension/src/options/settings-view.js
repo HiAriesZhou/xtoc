@@ -1,3 +1,4 @@
+import { icon } from '../ui/icons.js';
 import { viewAccount } from '../analytics/view-account.js';
 import { SEED_PATH } from '../library/dev-seed.js';
 import { TOC_PREFS_KEY, normalizeTocPrefs } from '../library/toc-prefs.js';
@@ -93,7 +94,7 @@ export function createSettingsView(ctx, { analyticsOnly = false } = {}) {
 
   function render() {
     main.innerHTML = `
-      <div class="page-top"><header class="page-head"><div class="page-title"><h1>Settings</h1></div></header></div>
+      <div class="page-top">${analyticsOnly ? `<a class="back-link" href="#analytics">${icon('arrow')}Back to Analytics</a>` : ''}<header class="page-head"><div class="page-title"><h1>Settings</h1></div></header></div>
       <section class="card" id="contentsCard">
         <div class="card-head"><h2>Article contents</h2></div>
         <label class="check-row">

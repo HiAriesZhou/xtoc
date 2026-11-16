@@ -1,5 +1,5 @@
-// Library shell: hash routing between Clips, Bookmarks, Analytics and Settings, shared
-// state loading, the detail drawer and status toasts.
+// Shared module shell. Each module owns its local views and state.
+import { icon } from '../ui/icons.js';
 import { clipGroups, KEYS } from '../library/model.js';
 import { createClipsView } from './clips-view.js';
 import { createBookmarksView } from './bookmarks-view.js';
@@ -9,9 +9,19 @@ import { createAnalyticsView } from './analytics-view.js';
 const moduleName = location.pathname.split('/')[1];
 const isLibrary = moduleName === 'library';
 const ROUTES = isLibrary ? ['bookmarks', 'clips'] : moduleName === 'analytics' ? ['analytics', 'data'] : ['settings'];
-const routes = isLibrary ? [['bookmarks','Bookmarks'],['clips','Clips']] : moduleName === 'analytics' ? [['analytics','Analytics'],['data','Data & Sync']] : [['settings','Settings']];
 document.title = `XTOC ${moduleName[0].toUpperCase() + moduleName.slice(1)}`;
-document.body.insertAdjacentHTML('afterbegin', `<header class="global-nav"><a class="brand" href="../library/index.html"><img id="brandIcon" alt="" width="24" height="24">XTOC</a><nav aria-label="XTOC"><a href="../library/index.html" ${isLibrary ? 'aria-current="page"' : ''}>Library</a><a href="../analytics/index.html" ${moduleName === 'analytics' ? 'aria-current="page"' : ''}>Analytics</a><a href="../settings/index.html" ${moduleName === 'settings' ? 'aria-current="page"' : ''}>Settings</a></nav></header><div class="app"><aside class="sidebar"><nav class="nav" aria-label="${moduleName}">${routes.map(([route,label]) => `<a href="#${route}" data-route="${route}">${label}${isLibrary ? `<span class="nav-count" id="count-${route}"></span>` : ''}</a>`).join('')}</nav></aside><main class="main" id="main"></main><aside class="drawer" id="drawer" aria-label="Details" hidden></aside></div><div class="toast" id="toast" role="status" aria-live="polite" hidden></div>`);
+document.body.insertAdjacentHTML('afterbegin', `
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="global-nav">
+    <a class="brand" href="../library/index.html" aria-label="XTOC Library"><img id="brandIcon" alt="" width="24" height="24">XTOC</a>
+    <nav aria-label="XTOC">
+      <a href="../library/index.html" ${isLibrary ? 'aria-current="page"' : ''}>Library</a>
+      <a href="../analytics/index.html" ${moduleName === 'analytics' ? 'aria-current="page"' : ''}>Analytics</a>
+    </nav>
+    <a class="settings-link" href="../settings/index.html" aria-label="Settings" ${moduleName === 'settings' ? 'aria-current="page"' : ''}>${icon('settings')}<span>Settings</span></a>
+  </header>
+  <div class="app"><main class="main ${isLibrary ? 'main-library' : ''}" id="main" tabindex="-1"></main><aside class="drawer" id="drawer" aria-label="Details" hidden></aside></div>
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>`);
 
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
   if (sender.id !== chrome.runtime.id || message.action !== 'app:locate' || message.page !== moduleName) return false;
@@ -93,26 +103,27 @@ const currentRoute = () => {
 function renderCounts() {
   if (!isLibrary) return;
   const clipCount = clipGroups(ctx.state).reduce((sum, group) => sum + group.excerpts.length, 0);
-  document.getElementById('count-clips').textContent = clipCount || '';
-  document.getElementById('count-bookmarks').textContent =
-    Object.keys(ctx.state.bookmarks).length || '';
+  const clips = document.getElementById('count-clips');
+  const bookmarks = document.getElementById('count-bookmarks');
+  if (clips) clips.textContent = clipCount || '';
+  if (bookmarks) bookmarks.textContent = Object.keys(ctx.state.bookmarks).length || '';
 }
 
 function render() {
   const route = currentRoute();
   main.classList.toggle('main-analytics', route === 'analytics');
-  document.body.classList.toggle('analytics-active', route === 'analytics');
-  document.querySelectorAll('[data-route]').forEach((link) => {
-    const active = link.dataset.route === route;
-    link.classList.toggle('active', active);
-    if (active) link.setAttribute('aria-current', 'page'); else link.removeAttribute('aria-current');
-  });
   document.querySelector('.viz-tip')?.setAttribute('hidden', '');
   if (isLibrary) chrome.storage.local.set({ xtocLibraryRoute: route });
   views[route].render(main);
+  renderCounts();
 }
 
 document.querySelector('.global-nav').addEventListener('click', event => { if (event.target.closest('a') && !ctx.confirmDiscard()) event.preventDefault(); });
+document.querySelector('.skip-link').addEventListener('click', event => {
+  event.preventDefault(); // The hash belongs to the module router, not focus targets.
+  main.focus();
+  main.scrollIntoView({ block: 'start' });
+});
 let lastRoute = currentRoute();
 window.addEventListener('hashchange', () => {
   if (!ctx.confirmDiscard()) {
