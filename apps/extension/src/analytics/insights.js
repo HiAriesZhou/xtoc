@@ -178,7 +178,7 @@ export function digestMarkdown(account, options = {}) {
     .map((k) => `| ${k.label} | ${k.value === null ? 'n/a' : k.format === 'percent' ? pct(k.value) : k.format === 'signed' ? signed(k.value) : fmt(k.value)} | ${k.change === null ? '' : `${(k.change * 100).toFixed(0)}%`} |`)
     .join('\n');
   const ledger = d.ledger.length
-    ? d.ledger.map((row) => `| @${row.handle} | ${row.replies} | ${fmt(row.impressions)} | ${row.follows} |`).join('\n')
+    ? d.ledger.map((row) => `| @${row.handle} | ${row.replies} | ${fmt(row.impressions)} | ${fmt(row.follows)} |`).join('\n')
     : '';
   return [
     '---',
@@ -213,7 +213,7 @@ export function interpretationInput(account, { days = 28, today = Date.now() } =
     coverageDays: s.coverage, comparable: s.comparable,
     evidenceNotes: ['Daily totals include only observed days. Post metrics are captured lifetime values for posts published in the window. Ratios do not establish attribution.'],
     totals: Object.fromEntries(Object.entries(s.current).filter(([key]) => key !== 'days' && key !== 'metricDays').map(([key,value]) => [key, s.current.metricDays[key] === s.current.days ? value : null])),
-    previousTotals: s.comparable ? Object.fromEntries(Object.entries(s.previous).filter(([key]) => key !== 'days' && key !== 'metricDays')) : null,
+    previousTotals: s.comparable ? Object.fromEntries(Object.entries(s.previous).filter(([key]) => key !== 'days' && key !== 'metricDays').map(([key,value]) => [key, s.previous.metricDays[key] === s.previous.days ? value : null])) : null,
     ratios: Object.fromEntries(Object.entries(derived(s.current)).map(([k, v]) => [k, round(v)])),
     posts: posts.length,
     replies: posts.filter((p) => p.kind === 'reply').length,

@@ -65,3 +65,17 @@ test('reply totals do not fill absent follower observations with zero', () => {
  assert.equal(row.follows,null);
  assert.equal(row.followsPerReply,null);
 });
+
+test('AI previous-period totals preserve missing metric coverage just like the current period', () => {
+ const daily={'2026-11-15':{Impressions:100,ProfileVisits:4},'2026-11-14':{Impressions:100,ProfileVisits:3},'2026-11-13':{Impressions:50,ProfileVisits:2},'2026-11-12':{Impressions:50}};
+ const input=interpretationInput({daily,posts:{}},{days:2,today});
+ assert.equal(input.totals.ProfileVisits,7);
+ assert.equal(input.previousTotals.ProfileVisits,null);
+ assert.equal(input.previousTotals.Impressions,100);
+});
+
+test('Markdown renders an unobserved follower metric as unavailable', async () => {
+ const {digestMarkdown}=await import('../src/analytics/insights.js');
+ const posts={a:{...p('a',today-DAY,{Impressions:100}),kind:'reply',replyTo:{handle:'reader'}}};
+ assert.match(digestMarkdown({posts},{days:7,today}),/\| @reader \| 1 \| 100 \| n\/a \|/);
+});
